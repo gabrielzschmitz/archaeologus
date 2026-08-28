@@ -167,6 +167,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "archaeologist-core",
+ "criterion",
+ "rayon",
+ "serde",
+ "tempfile",
  "tokio",
  "tracing",
  "tree-sitter",
