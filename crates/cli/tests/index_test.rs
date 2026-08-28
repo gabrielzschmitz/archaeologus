@@ -258,7 +258,8 @@ fn all_symbol_kinds_map_without_panic() {
         // replicate it here so the test has no dependency on internal fns.
         use archaeologist_core::models::SymbolType;
         let _mapped: SymbolType = match kind {
-            SymbolKind::Function | SymbolKind::Constructor => SymbolType::Function,
+            SymbolKind::Function => SymbolType::Function,
+            SymbolKind::Constructor => SymbolType::Constructor,
             SymbolKind::Method => SymbolType::Method,
             SymbolKind::Struct => SymbolType::Struct,
             SymbolKind::Enum => SymbolType::Enum,
@@ -270,6 +271,185 @@ fn all_symbol_kinds_map_without_panic() {
             SymbolKind::Type => SymbolType::Type,
         };
     }
+}
+
+// ── Branches and tags (no DB) ────────────────────────────────────────────────
+
+/// `list_branches` finds a branch in a fresh local repo.
+#[test]
+fn list_branches_finds_default_branch() {
+    let repo_dir = make_rust_repo();
+    let branches =
+        archaeologist_git::list_branches(repo_dir.path()).expect("list_branches should succeed");
+
+    assert!(!branches.is_empty(), "should find at least one branch");
+    // Every branch must have a non-empty name and SHA.
+    for b in &branches {
+        assert!(!b.name.is_empty(), "branch has empty name");
+        assert!(!b.head_sha.is_empty(), "branch {} has empty SHA", b.name);
+    }
+    // Local-only repos have no remote HEAD; at most one branch is default.
+    let defaults = branches.iter().filter(|b| b.is_default).count();
+    assert!(defaults <= 1, "expected at most 1 default, got {defaults}");
+}
+
+/// `list_branches` on a path that is not a git repo returns an error.
+#[test]
+fn list_branches_on_non_repo_returns_error() {
+    let dir = TempDir::new().unwrap();
+    assert!(archaeologist_git::list_branches(dir.path()).is_err());
+}
+
+/// After cloning a repo that has multiple branches, `list_branches` sees all
+/// of them — including branches that were never checked out locally.
+#[test]
+fn list_branches_includes_remote_tracking_branches() {
+    // Build a source repo with two branches.
+    let src_dir = TempDir::new().unwrap();
+    let repo = git2::Repository::init(src_dir.path()).unwrap();
+    let sig = git2::Signature::now("T", "t@t.com").unwrap();
+
+    // Commit on main/master.
+    std::fs::write(src_dir.path().join("a.rs"), "fn a() {}").unwrap();
+    let mut idx = repo.index().unwrap();
+    idx.add_path(std::path::Path::new("a.rs")).unwrap();
+    idx.write().unwrap();
+    let t1 = repo.find_tree(idx.write_tree().unwrap()).unwrap();
+    let c1 = repo
+        .commit(Some("HEAD"), &sig, &sig, "init", &t1, &[])
+        .unwrap();
+
+    // Create a feature branch pointing to a second commit.
+    std::fs::write(src_dir.path().join("b.rs"), "fn b() {}").unwrap();
+    let mut idx = repo.index().unwrap();
+    idx.add_path(std::path::Path::new("b.rs")).unwrap();
+    idx.write().unwrap();
+    let t2 = repo.find_tree(idx.write_tree().unwrap()).unwrap();
+    let parent = repo.find_commit(c1).unwrap();
+    repo.commit(
+        Some("refs/heads/feature"),
+        &sig,
+        &sig,
+        "feature",
+        &t2,
+        &[&parent],
+    )
+    .unwrap();
+
+    // Clone the source repo.
+    let dest_dir = TempDir::new().unwrap();
+    let dest = dest_dir.path().join("clone");
+    let url = format!("file://{}", src_dir.path().display());
+    archaeologist_git::clone_repository(&url, &dest, archaeologist_git::CloneOptions::default())
+        .expect("clone should succeed");
+
+    // list_branches on the clone should see both branches.
+    let branches = archaeologist_git::list_branches(&dest).expect("list_branches should succeed");
+    let names: std::collections::HashSet<String> =
+        branches.iter().map(|b| b.name.clone()).collect();
+
+    assert!(
+        names.contains("feature"),
+        "should see 'feature' branch via remote tracking refs; got {names:?}"
+    );
+    // default branch (main/master) should also be present
+    assert!(
+        names.contains("main") || names.contains("master"),
+        "should see default branch; got {names:?}"
+    );
+}
+
+/// `list_tags` returns empty for a repo with no tags.
+#[test]
+fn list_tags_empty_for_fresh_repo() {
+    let repo_dir = make_rust_repo();
+    let tags = archaeologist_git::list_tags(repo_dir.path()).expect("list_tags should succeed");
+    assert!(tags.is_empty());
+}
+
+/// `list_tags` returns the tag after one is created.
+#[test]
+fn list_tags_finds_lightweight_tag() {
+    let repo_dir = make_rust_repo();
+
+    // Create a lightweight tag on HEAD.
+    let repo = git2::Repository::open(repo_dir.path()).unwrap();
+    let head = repo.head().unwrap().target().unwrap();
+    let obj = repo.find_object(head, None).unwrap();
+    repo.tag_lightweight("v0.1.0", &obj, false).unwrap();
+
+    let tags = archaeologist_git::list_tags(repo_dir.path()).expect("list_tags should succeed");
+    assert_eq!(tags.len(), 1);
+    assert_eq!(tags[0].name, "v0.1.0");
+    assert!(!tags[0].target_sha.is_empty());
+}
+
+// ── commit_files (diff pipeline, no DB) ──────────────────────────────────────
+
+/// `diff_commit` on the initial commit reports the file as added.
+#[test]
+fn diff_commit_reports_initial_file_as_added() {
+    use archaeologist_git::FileStatus;
+
+    let repo_dir = make_rust_repo();
+    let repo = git2::Repository::open(repo_dir.path()).unwrap();
+    let head_sha = repo.head().unwrap().target().unwrap().to_string();
+
+    let diff = archaeologist_git::diff_commit(repo_dir.path(), &head_sha)
+        .expect("diff_commit should succeed");
+
+    assert!(!diff.is_empty(), "diff should have at least one file");
+    assert_eq!(
+        diff[0].status,
+        FileStatus::Added,
+        "initial commit file should be Added"
+    );
+    assert_eq!(diff[0].file_path, "lib.rs");
+}
+
+/// `diff_commit` with an invalid SHA returns an error.
+#[test]
+fn diff_commit_invalid_sha_returns_error() {
+    let repo_dir = make_rust_repo();
+    let result =
+        archaeologist_git::diff_commit(repo_dir.path(), "0000000000000000000000000000000000000000");
+    assert!(result.is_err());
+}
+
+// ── Symbol dependencies (indexer, no DB) ─────────────────────────────────────
+
+/// The indexer extracts import dependencies from a Rust file.
+#[test]
+fn indexer_extracts_rust_dependencies() {
+    let dir = TempDir::new().unwrap();
+    let src = dir.path().join("main.rs");
+    std::fs::write(
+        &src,
+        r"
+use std::collections::HashMap;
+use std::path::Path;
+
+fn main() {
+    let _map: HashMap<String, i32> = HashMap::new();
+}
+",
+    )
+    .unwrap();
+
+    let results = archaeologist_indexer::index_directory(dir.path(), |_, _| {})
+        .expect("index should succeed");
+    let file = results
+        .iter()
+        .find(|f| f.language == archaeologist_indexer::Lang::Rust)
+        .expect("should find Rust file");
+
+    assert!(!file.dependencies.is_empty(), "should extract dependencies");
+
+    let has_import = file
+        .dependencies
+        .iter()
+        .any(|d| d.kind == archaeologist_indexer::DependencyKind::Import);
+    assert!(has_import, "should detect use declarations as imports");
 }
 
 // ── Git history walk (no DB) ─────────────────────────────────────────────────

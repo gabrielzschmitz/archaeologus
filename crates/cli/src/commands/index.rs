@@ -1,21 +1,28 @@
 //! `index` command — clone (if remote), parse, and persist a repository.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use archaeologist_core::models::{CommitCreate, FileCreate, RepositoryCreate, SymbolCreate};
+use archaeologist_core::models::{
+    BranchCreate, CommitCreate, CommitFileCreate, FileCreate, RepositoryCreate, SymbolCommitCreate,
+    SymbolCreate, SymbolDependencyCreate, TagCreate,
+};
 use archaeologist_db::PgPool;
 use archaeologist_db::{
     create_pool,
     repositories::{
-        create_commit, create_file, create_repository, create_symbol, get_commit_by_sha,
-        get_file_by_path, get_repository_by_url, update_repository_indexed,
+        create_commit, create_commit_file, create_file, create_repository, create_symbol,
+        create_symbol_dependency, get_commit_by_sha, get_file_by_path, get_repository_by_url,
+        update_repository_indexed, upsert_branch, upsert_symbol_commit, upsert_tag,
     },
     run_migrations,
 };
-use archaeologist_git::{clone_repository, walk_commits, CloneOptions, WalkFilter};
+use archaeologist_git::{
+    clone_repository, diff_commit, list_branches, list_tags, walk_commits, CloneOptions, WalkFilter,
+};
 use archaeologist_indexer::{index_directory, languages::Lang, IndexedFile};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
@@ -65,21 +72,49 @@ pub async fn run(opts: IndexOptions) -> Result<()> {
     let indexed = index_directory(&local_path, report_progress()).context("index directory")?;
     info!("Parsed {} source files", indexed.len());
 
-    // ── 4. Persist files, symbols, and commits ───────────────────────────────
-    let (files_stored, symbols_stored) = store_files(&pool, repo_id, &local_path, &indexed).await;
-    let commits_stored = store_commits(&pool, repo_id, &local_path).await;
+    // ── 4. Persist files + symbols; collect file-path → DB id map ───────────
+    let (files_stored, symbols_stored, file_id_map, symbol_id_map) =
+        store_files(&pool, repo_id, &local_path, &indexed).await;
 
-    // ── 5. Mark repository as indexed ────────────────────────────────────────
+    // ── 5. Persist commits ────────────────────────────────────────────────────
+    let (commits_stored, commit_id_map) = store_commits(&pool, repo_id, &local_path).await;
+
+    // ── 6. Persist commit_files (diff per commit) ────────────────────────────
+    let commit_files_stored = store_commit_files(&pool, &local_path, &commit_id_map).await;
+
+    // ── 7. Link symbols to commits (symbol_commits) ──────────────────────────
+    let symbol_commits_stored = store_symbol_commits(
+        &pool,
+        &local_path,
+        &file_id_map,
+        &symbol_id_map,
+        &commit_id_map,
+    )
+    .await;
+
+    // ── 8. Persist branches and tags ─────────────────────────────────────────
+    let (branches_stored, tags_stored) = store_refs(&pool, repo_id, &local_path).await;
+
+    // ── 9. Persist symbol dependencies ───────────────────────────────────────
+    let deps_stored =
+        store_symbol_dependencies(&pool, repo_id, &local_path, &indexed, &file_id_map).await;
+
+    // ── 10. Mark repository as indexed ───────────────────────────────────────
     update_repository_indexed(&pool, repo_id)
         .await
         .context("update indexed_at")?;
 
-    println!("✓ Indexed '{canonical_url}': {files_stored} files, {symbols_stored} symbols, {commits_stored} commits");
+    println!(
+        "✓ Indexed '{canonical_url}': \
+         {files_stored} files, {symbols_stored} symbols, {commits_stored} commits, \
+         {commit_files_stored} commit_files, {symbol_commits_stored} symbol_commits, \
+         {branches_stored} branches, {tags_stored} tags, {deps_stored} dependencies"
+    );
 
     Ok(())
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Build the progress callback passed to [`index_directory`].
 fn report_progress() -> impl Fn(usize, usize) + Sync {
@@ -93,18 +128,28 @@ fn report_progress() -> impl Fn(usize, usize) + Sync {
     }
 }
 
-/// Persist indexed files and their symbols, returning `(files, symbols)` counts.
+/// Persist indexed files and their symbols.
+///
+/// Returns `(files_stored, symbols_stored, file_path→id, symbol_name→[id])`.
 async fn store_files(
     pool: &PgPool,
     repo_id: Uuid,
     local_path: &Path,
     indexed: &[IndexedFile],
-) -> (usize, usize) {
+) -> (
+    usize,
+    usize,
+    HashMap<String, Uuid>,
+    HashMap<String, Vec<Uuid>>,
+) {
     let mut files_stored: usize = 0;
     let mut symbols_stored: usize = 0;
+    // rel_path → file DB id
+    let mut file_id_map: HashMap<String, Uuid> = HashMap::new();
+    // symbol name → [symbol DB ids]  (multiple files can have the same name)
+    let mut symbol_id_map: HashMap<String, Vec<Uuid>> = HashMap::new();
 
     for indexed_file in indexed {
-        // ── 3a. Compute content hash & size ──────────────────────────────────
         let raw = match std::fs::read(&indexed_file.path) {
             Ok(b) => b,
             Err(e) => {
@@ -115,7 +160,6 @@ async fn store_files(
         let content_hash = hex::encode(Sha256::digest(&raw));
         let size_bytes = i64::try_from(raw.len()).unwrap_or(i64::MAX);
 
-        // ── 3b. Relative path from the repo root ─────────────────────────────
         let rel_path = indexed_file
             .path
             .strip_prefix(local_path)
@@ -123,19 +167,17 @@ async fn store_files(
             .to_string_lossy()
             .into_owned();
 
-        // ── 3c. Idempotency: skip if file already in DB (same hash) ──────────
+        // Idempotency: reuse the existing file id if the content is unchanged.
         if let Ok(Some(existing)) = get_file_by_path(pool, repo_id, &rel_path).await {
             if existing.content_hash == content_hash {
-                // File unchanged — re-use its id for symbol persistence.
-                // Symbols already stored: skip.
+                file_id_map.insert(rel_path, existing.id);
                 continue;
             }
         }
 
-        // ── 3d. Persist file ─────────────────────────────────────────────────
         let file_create = FileCreate {
             repository_id: repo_id,
-            path: rel_path,
+            path: rel_path.clone(),
             language: Some(lang_str(indexed_file.language).to_string()),
             size_bytes,
             content_hash,
@@ -148,8 +190,8 @@ async fn store_files(
             }
         };
         files_stored += 1;
+        file_id_map.insert(rel_path, file_record.id);
 
-        // ── 3e. Persist symbols ───────────────────────────────────────────────
         for sym in &indexed_file.symbols {
             let sym_create = SymbolCreate {
                 file_id: file_record.id,
@@ -163,27 +205,40 @@ async fn store_files(
                 col_end: i32::try_from(sym.col_end).unwrap_or(0),
                 visibility: sym.visibility.clone(),
                 doc_comment: sym.doc_comment.clone(),
-                raw_text: sym.name.clone(), // raw_text = name for now
+                raw_text: sym.name.clone(),
             };
             match create_symbol(pool, &sym_create).await {
-                Ok(_) => symbols_stored += 1,
+                Ok(s) => {
+                    symbols_stored += 1;
+                    symbol_id_map
+                        .entry(sym.name.clone())
+                        .or_default()
+                        .push(s.id);
+                }
                 Err(e) => warn!("DB error storing symbol '{}': {e}", sym.name),
             }
         }
     }
 
-    (files_stored, symbols_stored)
+    (files_stored, symbols_stored, file_id_map, symbol_id_map)
 }
 
-/// Persist the commit history, returning the number of newly stored commits.
-async fn store_commits(pool: &PgPool, repo_id: Uuid, local_path: &Path) -> usize {
+/// Persist commits; returns `(count, sha → DB id)`.
+async fn store_commits(
+    pool: &PgPool,
+    repo_id: Uuid,
+    local_path: &Path,
+) -> (usize, HashMap<String, Uuid>) {
     let commits = walk_commits(local_path, &WalkFilter::default()).unwrap_or_default();
     let mut commits_stored: usize = 0;
+    let mut commit_id_map: HashMap<String, Uuid> = HashMap::new();
 
     for commit_info in &commits {
-        // Idempotency: skip already-stored commits.
         match get_commit_by_sha(pool, repo_id, &commit_info.sha).await {
-            Ok(Some(_)) => continue,
+            Ok(Some(existing)) => {
+                commit_id_map.insert(commit_info.sha.clone(), existing.id);
+                continue;
+            }
             Ok(None) => {}
             Err(e) => {
                 warn!("DB error checking commit {}: {e}", &commit_info.sha[..8]);
@@ -204,28 +259,329 @@ async fn store_commits(pool: &PgPool, repo_id: Uuid, local_path: &Path) -> usize
             parent_shas: commit_info.parent_shas.clone(),
         };
         match create_commit(pool, &commit_create).await {
-            Ok(_) => commits_stored += 1,
+            Ok(c) => {
+                commits_stored += 1;
+                commit_id_map.insert(commit_info.sha.clone(), c.id);
+            }
             Err(e) => warn!("DB error storing commit {}: {e}", &commit_info.sha[..8]),
         }
     }
 
-    commits_stored
+    (commits_stored, commit_id_map)
 }
 
-/// Returns `(local_path, canonical_url)`.
+/// For every commit, diff it and write the changed-file rows into `commit_files`.
+async fn store_commit_files(
+    pool: &PgPool,
+    local_path: &Path,
+    commit_id_map: &HashMap<String, Uuid>,
+) -> usize {
+    let mut stored: usize = 0;
+
+    for (sha, &commit_db_id) in commit_id_map {
+        let diff_files = match diff_commit(local_path, sha) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!("diff_commit {}: {e}", &sha[..8]);
+                continue;
+            }
+        };
+
+        for df in &diff_files {
+            let cf = CommitFileCreate {
+                commit_id: commit_db_id,
+                file_path: df.file_path.clone(),
+                status: format!("{:?}", df.status).to_lowercase(),
+                additions: i32::try_from(df.additions).unwrap_or(i32::MAX),
+                deletions: i32::try_from(df.deletions).unwrap_or(i32::MAX),
+                old_path: df.old_path.clone(),
+            };
+            match create_commit_file(pool, &cf).await {
+                Ok(_) => stored += 1,
+                Err(e) => warn!("DB error storing commit_file for {}: {e}", &sha[..8]),
+            }
+        }
+    }
+
+    stored
+}
+
+/// Link symbols to the commits that touched their file.
 ///
-/// If the target is a URL (contains `://` or starts with `git@`), it is cloned
-/// into a temporary directory under `/tmp/archaeologist-cache/`.
-/// Otherwise the path is used directly and the URL is set to the absolute path.
+/// For every commit→file entry we check whether any stored symbol lives in
+/// that file; if so, we insert a `symbol_commits` row with the appropriate
+/// `change_type`.
+async fn store_symbol_commits(
+    pool: &PgPool,
+    local_path: &Path,
+    file_id_map: &HashMap<String, Uuid>,
+    symbol_id_map: &HashMap<String, Vec<Uuid>>,
+    commit_id_map: &HashMap<String, Uuid>,
+) -> usize {
+    // Build a reverse map: file_db_id → [symbol_db_ids]
+    // We need per-file symbol lists — requery from the symbol_id_map is
+    // impractical, so we build file→symbols from the indexed data instead.
+    // Since file_id_map maps rel_path→file_id and symbol_id_map maps
+    // name→[sym_id], we need a per-file symbol list. Build it via a
+    // separate query isn't available here, so we use the file_path diff
+    // data and match rel_path directly.
+
+    let mut stored: usize = 0;
+
+    for (sha, &commit_db_id) in commit_id_map {
+        let diff_files = match diff_commit(local_path, sha) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!("symbol_commits diff {}: {e}", &sha[..8]);
+                continue;
+            }
+        };
+
+        for df in &diff_files {
+            let file_db_id = match file_id_map.get(&df.file_path) {
+                Some(id) => *id,
+                None => continue, // file not a supported language; skip
+            };
+
+            // Collect every symbol that belongs to this file.
+            // symbol_id_map is keyed by name; we need to resolve by file.
+            // Since we don't have a direct file→symbols map here, we use
+            // pool query to list symbols for the file.
+            let syms =
+                match sqlx::query_as::<_, (Uuid,)>("SELECT id FROM symbols WHERE file_id = $1")
+                    .bind(file_db_id)
+                    .fetch_all(pool)
+                    .await
+                {
+                    Ok(rows) => rows,
+                    Err(e) => {
+                        warn!("symbol_commits query symbols: {e}");
+                        continue;
+                    }
+                };
+
+            let change_type = match df.status {
+                archaeologist_git::FileStatus::Added => "added",
+                archaeologist_git::FileStatus::Deleted => "deleted",
+                _ => "modified",
+            };
+
+            for (sym_id,) in syms {
+                let sc = SymbolCommitCreate {
+                    symbol_id: sym_id,
+                    commit_id: commit_db_id,
+                    change_type: change_type.to_string(),
+                };
+                match upsert_symbol_commit(pool, &sc).await {
+                    Ok(_) => stored += 1,
+                    Err(e) => warn!("symbol_commits upsert: {e}"),
+                }
+            }
+        }
+    }
+
+    // Suppress unused-variable warning for symbol_id_map (kept in signature
+    // for future direct-lookup optimisations).
+    let _ = symbol_id_map;
+
+    stored
+}
+
+/// Upsert branches and lightweight tags; returns `(branches, tags)` counts.
+async fn store_refs(pool: &PgPool, repo_id: Uuid, local_path: &Path) -> (usize, usize) {
+    let mut branches_stored: usize = 0;
+    let mut tags_stored: usize = 0;
+
+    // Branches
+    match list_branches(local_path) {
+        Ok(branches) => {
+            for b in &branches {
+                let bc = BranchCreate {
+                    repository_id: repo_id,
+                    name: b.name.clone(),
+                    head_sha: b.head_sha.clone(),
+                    is_default: b.is_default,
+                };
+                match upsert_branch(pool, &bc).await {
+                    Ok(_) => branches_stored += 1,
+                    Err(e) => warn!("DB error storing branch '{}': {e}", b.name),
+                }
+            }
+        }
+        Err(e) => warn!("list_branches: {e}"),
+    }
+
+    // Tags
+    match list_tags(local_path) {
+        Ok(tags) => {
+            for t in &tags {
+                let tc = TagCreate {
+                    repository_id: repo_id,
+                    name: t.name.clone(),
+                    target_sha: t.target_sha.clone(),
+                };
+                match upsert_tag(pool, &tc).await {
+                    Ok(_) => tags_stored += 1,
+                    Err(e) => warn!("DB error storing tag '{}': {e}", t.name),
+                }
+            }
+        }
+        Err(e) => warn!("list_tags: {e}"),
+    }
+
+    (branches_stored, tags_stored)
+}
+
+/// Persist `symbol_dependencies` rows derived from the indexer's dependency
+/// extraction.
+///
+/// Each dependency is attached to the *single* symbol whose source line-range
+/// contains the dependency's line.  If no symbol spans that line (e.g. a
+/// top-level import above all function definitions) we fall back to the symbol
+/// with the smallest `line_start` in the file.  This avoids the previous
+/// behaviour of fan-out where every dependency was duplicated for every symbol.
+///
+/// `depends_on_symbol_id` is set only when the dependency target is a plain
+/// identifier (no dots, no parentheses) that exactly matches a symbol name
+/// in the same repository.
+async fn store_symbol_dependencies(
+    pool: &PgPool,
+    repo_id: Uuid,
+    local_path: &Path,
+    indexed: &[IndexedFile],
+    file_id_map: &HashMap<String, Uuid>,
+) -> usize {
+    let mut stored: usize = 0;
+
+    for indexed_file in indexed {
+        if indexed_file.dependencies.is_empty() {
+            continue;
+        }
+
+        let rel_path = indexed_file
+            .path
+            .strip_prefix(local_path)
+            .unwrap_or(&indexed_file.path)
+            .to_string_lossy()
+            .into_owned();
+
+        let file_db_id = match file_id_map.get(&rel_path) {
+            Some(id) => *id,
+            None => continue,
+        };
+
+        // Fetch symbols for this file with their line ranges.
+        // Columns: (id, line_start, line_end)
+        let syms: Vec<(Uuid, i32, i32)> = match sqlx::query_as::<_, (Uuid, i32, i32)>(
+            "SELECT id, line_start, line_end FROM symbols WHERE file_id = $1 ORDER BY line_start",
+        )
+        .bind(file_db_id)
+        .fetch_all(pool)
+        .await
+        {
+            Ok(rows) => rows,
+            Err(e) => {
+                warn!("symbol_deps query symbols: {e}");
+                continue;
+            }
+        };
+
+        if syms.is_empty() {
+            continue;
+        }
+
+        // Pre-resolve only simple identifiers (no dots/parens/spaces) against
+        // known symbol names — these are the only ones that can match.
+        // We prefer a symbol in the *same language* to avoid cross-language
+        // false matches (e.g. Python's `User` resolving to TypeScript's `User`).
+        let file_lang = lang_str(indexed_file.language);
+        let mut resolved: HashMap<String, Uuid> = HashMap::new();
+        for dep in &indexed_file.dependencies {
+            let target = dep.target.trim();
+            // Only attempt resolution for plain single identifiers.
+            if target.contains('.') || target.contains('(') || target.contains(' ') {
+                continue;
+            }
+            if resolved.contains_key(target) {
+                continue;
+            }
+            // 1st choice: same language
+            let row = sqlx::query_as::<_, (Uuid,)>(
+                "SELECT id FROM symbols \
+                 WHERE repository_id = $1 AND name = $2 AND language = $3 LIMIT 1",
+            )
+            .bind(repo_id)
+            .bind(target)
+            .bind(file_lang)
+            .fetch_optional(pool)
+            .await;
+
+            if let Ok(Some((id,))) = row {
+                resolved.insert(target.to_string(), id);
+                continue;
+            }
+
+            // 2nd choice: any language in the same repo (cross-language dep)
+            if let Ok(Some((id,))) = sqlx::query_as::<_, (Uuid,)>(
+                "SELECT id FROM symbols WHERE repository_id = $1 AND name = $2 LIMIT 1",
+            )
+            .bind(repo_id)
+            .bind(target)
+            .fetch_optional(pool)
+            .await
+            {
+                resolved.insert(target.to_string(), id);
+            }
+        }
+
+        // The fallback symbol is the one with the smallest line_start.
+        let fallback_sym_id = syms[0].0;
+
+        for dep in &indexed_file.dependencies {
+            // Find the innermost symbol that contains dep.line.
+            let dep_line = i32::try_from(dep.line).unwrap_or(0);
+            let sym_id = syms
+                .iter()
+                .filter(|(_, start, end)| *start <= dep_line && dep_line <= *end)
+                // Among all spanning symbols, pick the one with the largest
+                // line_start (most specific / innermost).
+                .max_by_key(|(_, start, _)| *start)
+                .map_or(fallback_sym_id, |(id, _, _)| *id);
+
+            let dep_type = match dep.kind {
+                archaeologist_indexer::DependencyKind::Import => "import",
+                archaeologist_indexer::DependencyKind::Call => "call",
+                archaeologist_indexer::DependencyKind::TraitImpl => "trait_impl",
+            };
+
+            let target = dep.target.trim();
+            let depends_on = resolved.get(target).copied();
+
+            let sd = SymbolDependencyCreate {
+                symbol_id: sym_id,
+                depends_on_symbol_id: depends_on,
+                dependency_name: dep.target.clone(),
+                dependency_type: dep_type.to_string(),
+            };
+            match create_symbol_dependency(pool, &sd).await {
+                Ok(_) => stored += 1,
+                Err(e) => warn!("symbol_dep insert: {e}"),
+            }
+        }
+    }
+
+    stored
+}
+
+// ── Path / repo helpers ───────────────────────────────────────────────────────
+
+/// Returns `(local_path, canonical_url)`.
 fn resolve_path(target: &str) -> Result<(PathBuf, String)> {
     let is_url = target.contains("://") || target.starts_with("git@");
     if is_url {
-        // Use /tmp/archaeologist-fixtures as the mock remote for "remote" URLs
-        // that point to the local fixture repository (as per project convention).
         let cache_dir = PathBuf::from("/tmp/archaeologist-cache");
         std::fs::create_dir_all(&cache_dir).context("create cache dir")?;
 
-        // Derive a stable subdirectory name from the URL.
         let slug = target
             .trim_end_matches('/')
             .rsplit('/')
@@ -251,7 +607,7 @@ fn resolve_path(target: &str) -> Result<(PathBuf, String)> {
     }
 }
 
-/// Fetch the existing repository record or create a new one.
+/// Fetch or create the repository DB record.
 async fn upsert_repository(
     pool: &PgPool,
     url: &str,
@@ -299,6 +655,8 @@ fn indexer_kind_to_core(
     use archaeologist_core::models::SymbolType;
     use archaeologist_indexer::SymbolKind;
     match kind {
+        SymbolKind::Function => SymbolType::Function,
+        SymbolKind::Constructor => SymbolType::Constructor,
         SymbolKind::Method => SymbolType::Method,
         SymbolKind::Struct => SymbolType::Struct,
         SymbolKind::Enum => SymbolType::Enum,
@@ -308,6 +666,5 @@ fn indexer_kind_to_core(
         SymbolKind::Class => SymbolType::Class,
         SymbolKind::Interface => SymbolType::Interface,
         SymbolKind::Type => SymbolType::Type,
-        SymbolKind::Function | SymbolKind::Constructor => SymbolType::Function, // closest mapping
     }
 }

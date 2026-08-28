@@ -109,8 +109,10 @@ fn extract_python_deps(root: Node<'_>, source: &[u8]) -> Vec<Dependency> {
     let mut out = Vec::new();
     walk_named(root, &mut |node| match node.kind() {
         "import_statement" | "import_from_statement" => {
-            let text = node_text(node, source).to_string();
-            out.push(dep(text, DependencyKind::Import, node));
+            let text = node_text(node, source).trim().to_string();
+            if !text.is_empty() {
+                out.push(dep(text, DependencyKind::Import, node));
+            }
         }
         "call" => {
             if let Some(func) = node.child_by_field_name("function") {
@@ -149,8 +151,45 @@ fn extract_go_deps(root: Node<'_>, source: &[u8]) -> Vec<Dependency> {
     let mut out = Vec::new();
     walk_named(root, &mut |node| match node.kind() {
         "import_declaration" => {
-            let text = node_text(node, source).to_string();
-            out.push(dep(text, DependencyKind::Import, node));
+            // Walk the import spec children to collect individual path strings
+            // rather than the raw `import "pkg"` text with leading keyword.
+            let mut cursor = node.walk();
+            let mut found = false;
+            for child in node.children(&mut cursor) {
+                match child.kind() {
+                    "interpreted_string_literal" | "raw_string_literal" => {
+                        let path = node_text(child, source).trim().to_string();
+                        if !path.is_empty() {
+                            out.push(dep(path, DependencyKind::Import, child));
+                            found = true;
+                        }
+                    }
+                    "import_spec" => {
+                        // import ( "pkg" ) — path is a child of import_spec
+                        let mut c2 = child.walk();
+                        for spec_child in child.children(&mut c2) {
+                            if matches!(
+                                spec_child.kind(),
+                                "interpreted_string_literal" | "raw_string_literal"
+                            ) {
+                                let path = node_text(spec_child, source).trim().to_string();
+                                if !path.is_empty() {
+                                    out.push(dep(path, DependencyKind::Import, spec_child));
+                                    found = true;
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if !found {
+                // Fallback: trim the whole import declaration text.
+                let text = node_text(node, source).trim().to_string();
+                if !text.is_empty() {
+                    out.push(dep(text, DependencyKind::Import, node));
+                }
+            }
         }
         "call_expression" => {
             if let Some(func) = node.child_by_field_name("function") {
@@ -193,8 +232,13 @@ fn extract_c_deps(root: Node<'_>, source: &[u8]) -> Vec<Dependency> {
     let mut out = Vec::new();
     walk_named(root, &mut |node| match node.kind() {
         "preproc_include" => {
-            let text = node_text(node, source).to_string();
-            out.push(dep(text, DependencyKind::Import, node));
+            // Extract just the path child (system_lib_string or string_literal),
+            // e.g. "<stdio.h>" or "\"myfile.h\"", instead of the full raw text
+            // which includes trailing newlines.
+            let path = c_include_path(node, source);
+            if !path.is_empty() {
+                out.push(dep(path, DependencyKind::Import, node));
+            }
         }
         "call_expression" => {
             if let Some(func) = node.child_by_field_name("function") {
@@ -207,4 +251,20 @@ fn extract_c_deps(root: Node<'_>, source: &[u8]) -> Vec<Dependency> {
         _ => {}
     });
     out
+}
+
+/// Extract the include path from a `preproc_include` node.
+/// Returns e.g. `<stdio.h>` or `"myfile.h"`.
+fn c_include_path(node: Node<'_>, source: &[u8]) -> String {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        match child.kind() {
+            "system_lib_string" | "string_literal" | "string" => {
+                return node_text(child, source).trim().to_string();
+            }
+            _ => {}
+        }
+    }
+    // Fallback: trim the whole raw text.
+    node_text(node, source).trim().to_string()
 }

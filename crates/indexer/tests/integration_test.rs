@@ -495,3 +495,122 @@ fn index_directory_empty_dir_returns_empty() {
     let results = index_directory(tmp.path(), |_, _| {}).expect("should succeed on empty dir");
     assert!(results.is_empty());
 }
+
+// ── Dependency name cleanliness ───────────────────────────────────────────────
+
+/// C `#include` dependency names must be just the path (e.g. `<stdio.h>`),
+/// not the full raw text with `#include ` prefix and a trailing newline.
+#[test]
+fn deps_c_include_names_are_clean_paths() {
+    let src = read_fixture("c", "example.c");
+    let result = parse(&src, Lang::C).unwrap();
+    let deps = extract_dependencies(&result, &src);
+
+    let imports: Vec<&str> = deps
+        .iter()
+        .filter(|d| d.kind == DependencyKind::Import)
+        .map(|d| d.target.as_str())
+        .collect();
+
+    assert!(!imports.is_empty(), "should have at least one import");
+    for name in &imports {
+        assert!(
+            !name.contains('\n'),
+            "dependency name should not contain newlines: {name:?}"
+        );
+        assert!(
+            !name.starts_with("#include"),
+            "dependency name should not start with '#include': {name:?}"
+        );
+        // Should be just the path: <header.h> or "header.h"
+        assert!(
+            name.starts_with('<') || name.starts_with('"'),
+            "dependency name should be a path like <stdio.h>, got: {name:?}"
+        );
+    }
+}
+
+/// C++ `#include` dependency names must be just the path (e.g. `<iostream>`).
+#[test]
+fn deps_cpp_include_names_are_clean_paths() {
+    let src = read_fixture("cpp", "example.cpp");
+    let result = parse(&src, Lang::Cpp).unwrap();
+    let deps = extract_dependencies(&result, &src);
+
+    let imports: Vec<&str> = deps
+        .iter()
+        .filter(|d| d.kind == DependencyKind::Import)
+        .map(|d| d.target.as_str())
+        .collect();
+
+    assert!(!imports.is_empty(), "should have at least one import");
+    for name in &imports {
+        assert!(
+            !name.contains('\n'),
+            "dependency name should not contain newlines: {name:?}"
+        );
+        assert!(
+            !name.starts_with("#include"),
+            "dependency name should not start with '#include': {name:?}"
+        );
+        assert!(
+            name.starts_with('<') || name.starts_with('"'),
+            "dependency name should be a path like <vector>, got: {name:?}"
+        );
+    }
+
+    // The specific C++ fixture has exactly 3 includes.
+    assert_eq!(
+        imports.len(),
+        3,
+        "expected 3 includes (<iostream>, <string>, <vector>); got: {imports:?}"
+    );
+}
+
+/// Go import dependency names should be just the quoted path string (e.g. `"fmt"`),
+/// not the full `import "fmt"` declaration text.
+#[test]
+fn deps_go_import_names_are_clean_paths() {
+    let src = read_fixture("go", "example.go");
+    let result = parse(&src, Lang::Go).unwrap();
+    let deps = extract_dependencies(&result, &src);
+
+    let imports: Vec<&str> = deps
+        .iter()
+        .filter(|d| d.kind == DependencyKind::Import)
+        .map(|d| d.target.as_str())
+        .collect();
+
+    assert!(!imports.is_empty(), "should have at least one import");
+    for name in &imports {
+        assert!(
+            !name.contains('\n'),
+            "dependency name should not contain newlines: {name:?}"
+        );
+        assert!(
+            !name.starts_with("import"),
+            "dependency name should not start with 'import': {name:?}"
+        );
+    }
+
+    // The Go fixture has exactly one import: "fmt".
+    assert_eq!(imports.len(), 1, "expected 1 import; got: {imports:?}");
+    assert_eq!(imports[0], "\"fmt\"");
+}
+
+/// No dependency name across any fixture file should contain a raw newline character.
+#[test]
+fn no_dependency_name_contains_newline() {
+    let fixtures_dir = std::path::Path::new("/tmp/archaeologist-fixtures");
+    let results = index_directory(fixtures_dir, |_, _| {}).expect("index should succeed");
+    for indexed in &results {
+        for dep in &indexed.dependencies {
+            assert!(
+                !dep.target.contains('\n'),
+                "file {:?}: dependency {:?} contains a newline",
+                indexed.path,
+                dep.target
+            );
+        }
+    }
+}

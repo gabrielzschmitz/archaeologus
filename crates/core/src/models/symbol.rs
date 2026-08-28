@@ -20,6 +20,7 @@ pub enum SymbolType {
     Interface,
     Class,
     Macro,
+    Constructor,
 }
 
 impl std::fmt::Display for SymbolType {
@@ -40,6 +41,7 @@ impl std::fmt::Display for SymbolType {
             Self::Interface => write!(f, "interface"),
             Self::Class => write!(f, "class"),
             Self::Macro => write!(f, "macro"),
+            Self::Constructor => write!(f, "constructor"),
         }
     }
 }
@@ -64,6 +66,7 @@ impl std::str::FromStr for SymbolType {
             "interface" => Ok(Self::Interface),
             "class" => Ok(Self::Class),
             "macro" => Ok(Self::Macro),
+            "constructor" => Ok(Self::Constructor),
             _ => Err(crate::error::AppError::Validation(format!(
                 "Unknown symbol type: {s}"
             ))),
