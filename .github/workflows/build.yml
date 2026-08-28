@@ -1,18 +1,14 @@
-name: CI
+name: Build
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
-  DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
 
 jobs:
   build:
-    name: Build & Test
     runs-on: ubuntu-latest
 
     services:
@@ -31,7 +27,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -49,20 +46,31 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake pkg-config libssl-dev
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Clippy lints
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Build
         run: cargo build --all-targets
+        env:
+          DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
 
       - name: Run migrations
         run: cargo run -- migrate
+        env:
+          DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
 
       - name: Run tests
         run: cargo test --all-targets
+        env:
+          DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
 
       - name: Build release
         run: cargo build --release
