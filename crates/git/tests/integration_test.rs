@@ -24,12 +24,21 @@ fn build_repo(n: usize) -> (TempDir, Vec<String>) {
         let tree_id = idx.write_tree().unwrap();
         let tree = repo.find_tree(tree_id).unwrap();
 
-        let parents: Vec<git2::Commit> =
-            parent.map(|o| repo.find_commit(o).unwrap()).into_iter().collect();
+        let parents: Vec<git2::Commit> = parent
+            .map(|o| repo.find_commit(o).unwrap())
+            .into_iter()
+            .collect();
         let prefs: Vec<&git2::Commit> = parents.iter().collect();
 
         let oid = repo
-            .commit(Some("HEAD"), &sig, &sig, &format!("commit {i}"), &tree, &prefs)
+            .commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                &format!("commit {i}"),
+                &tree,
+                &prefs,
+            )
             .unwrap();
 
         parent = Some(oid);
@@ -50,7 +59,10 @@ fn integration_clone_local_repo() {
     assert!(result.is_ok(), "clone failed: {:?}", result.err());
 
     let cloned_path = result.unwrap();
-    assert!(cloned_path.join(".git").exists(), ".git dir missing after clone");
+    assert!(
+        cloned_path.join(".git").exists(),
+        ".git dir missing after clone"
+    );
 }
 
 #[test]

@@ -127,9 +127,7 @@ mod tests {
             let path = dir.path().join(format!("file{i}.txt"));
             std::fs::write(&path, format!("content {i}")).unwrap();
             let mut index = repo.index().unwrap();
-            index
-                .add_path(Path::new(&format!("file{i}.txt")))
-                .unwrap();
+            index.add_path(Path::new(&format!("file{i}.txt"))).unwrap();
             index.write().unwrap();
             let tree_id = index.write_tree().unwrap();
             let tree = repo.find_tree(tree_id).unwrap();

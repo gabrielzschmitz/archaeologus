@@ -163,7 +163,11 @@ mod tests {
     fn clone_invalid_url_returns_error() {
         let dest_dir = TempDir::new().unwrap();
         let dest = dest_dir.path().join("clone");
-        let result = clone_repository("file:///nonexistent/path/repo", &dest, CloneOptions::default());
+        let result = clone_repository(
+            "file:///nonexistent/path/repo",
+            &dest,
+            CloneOptions::default(),
+        );
         assert!(result.is_err());
     }
 }

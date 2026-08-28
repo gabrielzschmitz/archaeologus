@@ -54,8 +54,7 @@ pub fn diff_commit(repo_path: &Path, sha: &str) -> Result<Vec<CommitDiffFile>> {
     let repo = Repository::open(repo_path)
         .map_err(|_| GitError::RepoNotFound(repo_path.display().to_string()))?;
 
-    let oid = git2::Oid::from_str(sha)
-        .map_err(|_| GitError::CommitNotFound(sha.to_string()))?;
+    let oid = git2::Oid::from_str(sha).map_err(|_| GitError::CommitNotFound(sha.to_string()))?;
 
     let commit = repo
         .find_commit(oid)
@@ -241,10 +240,7 @@ mod tests {
     #[test]
     fn diff_unknown_sha_returns_error() {
         let (dir, _repo) = init_repo();
-        let result = diff_commit(
-            dir.path(),
-            "0000000000000000000000000000000000000000",
-        );
+        let result = diff_commit(dir.path(), "0000000000000000000000000000000000000000");
         assert!(result.is_err());
     }
 

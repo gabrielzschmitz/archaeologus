@@ -33,15 +33,13 @@ pub fn blame_file(repo_path: &Path, file_path: &str) -> Result<Vec<BlameHunk>> {
         return Ok(vec![]);
     }
 
-    let blame = repo
-        .blame_file(Path::new(file_path), None)
-        .map_err(|e| {
-            if e.message().contains("not found") || e.message().contains("does not exist") {
-                GitError::FileNotFound(file_path.to_string())
-            } else {
-                GitError::Git2(e)
-            }
-        })?;
+    let blame = repo.blame_file(Path::new(file_path), None).map_err(|e| {
+        if e.message().contains("not found") || e.message().contains("does not exist") {
+            GitError::FileNotFound(file_path.to_string())
+        } else {
+            GitError::Git2(e)
+        }
+    })?;
 
     let mut hunks: Vec<BlameHunk> = Vec::new();
 
@@ -62,9 +60,7 @@ pub fn blame_file(repo_path: &Path, file_path: &str) -> Result<Vec<BlameHunk>> {
         let line_count = raw.lines_in_hunk();
 
         if let Some(last) = hunks.last_mut() {
-            if last.commit_sha == commit_sha
-                && last.start_line + last.line_count == start_line
-            {
+            if last.commit_sha == commit_sha && last.start_line + last.line_count == start_line {
                 last.line_count += line_count;
                 continue;
             }

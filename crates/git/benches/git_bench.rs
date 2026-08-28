@@ -22,12 +22,21 @@ fn build_repo(n: usize) -> TempDir {
         let tree_id = idx.write_tree().unwrap();
         let tree = repo.find_tree(tree_id).unwrap();
 
-        let parents: Vec<git2::Commit> =
-            parent.map(|o| repo.find_commit(o).unwrap()).into_iter().collect();
+        let parents: Vec<git2::Commit> = parent
+            .map(|o| repo.find_commit(o).unwrap())
+            .into_iter()
+            .collect();
         let prefs: Vec<&git2::Commit> = parents.iter().collect();
 
         let oid = repo
-            .commit(Some("HEAD"), &sig, &sig, &format!("commit {i}"), &tree, &prefs)
+            .commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                &format!("commit {i}"),
+                &tree,
+                &prefs,
+            )
             .unwrap();
 
         parent = Some(oid);
@@ -55,7 +64,13 @@ fn build_large_file_repo(lines: usize) -> (TempDir, String) {
     repo.commit(Some("HEAD"), &sig, &sig, "add big file", &tree, &[])
         .unwrap();
 
-    let sha = repo.head().unwrap().peel_to_commit().unwrap().id().to_string();
+    let sha = repo
+        .head()
+        .unwrap()
+        .peel_to_commit()
+        .unwrap()
+        .id()
+        .to_string();
     (dir, sha)
 }
 
@@ -92,7 +107,13 @@ fn bench_diff(c: &mut Criterion) {
 
     let dir = build_repo(50);
     let repo = git2::Repository::open(dir.path()).unwrap();
-    let sha = repo.head().unwrap().peel_to_commit().unwrap().id().to_string();
+    let sha = repo
+        .head()
+        .unwrap()
+        .peel_to_commit()
+        .unwrap()
+        .id()
+        .to_string();
 
     group.bench_function("last_commit", |b| {
         b.iter(|| diff_commit(dir.path(), &sha).unwrap());
