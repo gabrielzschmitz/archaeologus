@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Index { url, branch } => {
+        Commands::Index { url, branch: _ } => {
             info!("Indexing repository: {}", url);
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
@@ -109,8 +109,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Search {
             query,
-            symbol_type,
-            language,
+            symbol_type: _,
+            language: _,
         } => {
             info!("Searching: {}", query);
             let pool = create_pool(&config.database_url).await?;
