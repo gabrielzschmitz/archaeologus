@@ -1,7 +1,7 @@
+mod commands;
+
 use archaeologist_core::AppConfig;
-use archaeologist_db::{create_pool, run_migrations};
 use clap::{Parser, Subcommand};
-use tracing::info;
 
 #[derive(Parser)]
 #[command(name = "archaeologist")]
@@ -16,9 +16,9 @@ struct Cli {
 enum Commands {
     /// Index a git repository for analysis
     Index {
-        /// Git repository URL
-        url: String,
-        /// Branch to index (default: main)
+        /// Git repository URL or local path
+        target: String,
+        /// Branch to record (does not affect clone)
         #[arg(short, long)]
         branch: Option<String>,
     },
@@ -69,42 +69,44 @@ enum Commands {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::from_env()?;
-
-    tracing_subscriber::fmt()
-        .with_env_filter(&config.rust_log)
-        .init();
-
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Index { url, branch: _ } => {
-            info!("Indexing repository: {url}");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
-            println!("Repository indexed successfully: {url}");
+        Commands::Index { target, branch } => {
+            commands::index::run(commands::index::IndexOptions {
+                target,
+                branch,
+                database_url: config.database_url,
+                rust_log: config.rust_log,
+            })
+            .await?;
         }
         Commands::Ask { question } => {
-            info!("Asking: {question}");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("Asking: {question}");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("Answer for: {question}");
         }
         Commands::Explain { target } => {
-            info!("Explaining: {target}");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("Explaining: {target}");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("Explanation for: {target}");
         }
         Commands::History { symbol } => {
-            info!("History for: {symbol}");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("History for: {symbol}");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("History for: {symbol}");
         }
         Commands::Impact { symbol } => {
-            info!("Impact analysis for: {symbol}");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("Impact analysis for: {symbol}");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("Impact analysis for: {symbol}");
         }
         Commands::Search {
@@ -112,24 +114,34 @@ async fn main() -> anyhow::Result<()> {
             symbol_type: _,
             language: _,
         } => {
-            info!("Searching: {query}");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("Searching: {query}");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("Search results for: {query}");
         }
         Commands::Mcp { transport, port } => {
-            info!("Starting MCP server (transport: {transport}, port: {port})");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("Starting MCP server (transport: {transport}, port: {port})");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("MCP server started");
         }
         Commands::Migrate => {
-            info!("Running migrations...");
-            let pool = create_pool(&config.database_url).await?;
-            run_migrations(&pool).await?;
+            init_tracing(&config.rust_log);
+            tracing::info!("Running migrations...");
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
             println!("Migrations completed");
         }
     }
 
     Ok(())
+}
+
+fn init_tracing(filter: &str) {
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .try_init()
+        .ok();
 }

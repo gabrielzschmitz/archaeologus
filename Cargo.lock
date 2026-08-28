@@ -95,11 +95,18 @@ dependencies = [
  "anyhow",
  "archaeologist-core",
  "archaeologist-db",
+ "archaeologist-git",
+ "archaeologist-indexer",
  "clap",
+ "git2",
+ "hex",
  "serde_json",
+ "sha2",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
