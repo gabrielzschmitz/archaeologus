@@ -12,6 +12,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
 
 [lints]
 workspace = true

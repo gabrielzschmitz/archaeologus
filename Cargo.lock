@@ -147,6 +147,7 @@ dependencies = [
  "archaeologist-core",
  "archaeologist-db",
  "archaeologist-git",
+ "chrono",
  "sqlx",
  "tokio",
  "tracing",
