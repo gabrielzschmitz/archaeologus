@@ -45,7 +45,7 @@ sqlx = { version = "0.8", features = [
 ] }
 
 # Git
-git2 = { version = "0.21", features = ["vendored-libgit2"] }
+git2 = { version = "0.21", features = ["https", "vendored-openssl", "vendored-libgit2"] }
 
 # Code parsing
 tree-sitter = "0.26"
