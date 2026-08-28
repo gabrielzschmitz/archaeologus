@@ -1,69 +1,18 @@
 # AI Software Archaeologist
 
-> **"Why is the code like this?"**
+<!-- <img align="right" width="192px" src="./resources/icons/icon.svg" alt="Archaeologist Logo"> -->
 
-An AI-powered tool that reconstructs the context, history, decisions, dependencies, and risks behind a codebase.
+<a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
+<a href="https://www.buymeacoffee.com/gabrielzschmitz" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 20px !important;width: 87px;" ></a>
+<a href="https://github.com/gabrielzschmitz/archaeologist"><img src="https://img.shields.io/github/stars/gabrielzschmitz/archaeologist?style=social" alt="Give me a Star"></a>
 
----
+**AI Software Archaeologist** answers the question: *"Why is the code like
+this?"*
 
-## Prerequisites
-
-### Required
-
-| Tool | Version | Install |
-|------|---------|---------|
-| **Rust** | 1.82+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
-| **Docker** | 24+ | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
-| **Docker Compose** | V2 | Included with Docker Desktop or `docker-compose-plugin` |
-| **Git** | 2.30+ | Usually pre-installed |
-| **CMake** | 3.x | Required by `git2` (libgit2 vendored build) |
-| **OpenSSL dev** | 1.1+ | Required by `reqwest` / TLS |
-
-### Verify installation
-
-```bash
-rustc --version    # rustc 1.82.0 or later
-cargo --version    # cargo 1.82.0 or later
-docker --version   # Docker 24+
-docker compose version  # Docker Compose V2
-git --version      # git 2.30+
-cmake --version    # cmake 3.x
-```
-
-### System-specific install
-
-**Arch Linux:**
-```bash
-sudo pacman -S rust docker docker-compose cmake openssl pkg-config base-devel git
-sudo systemctl enable --now docker
-```
-
-If `docker compose` (V2 plugin) isn't available:
-```bash
-sudo pacman -S docker-compose
-# or
-sudo pacman -S docker-buildx
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install -y build-essential pkg-config libssl-dev cmake git
-# Docker Compose V2 plugin
-sudo apt install docker-compose-plugin
-```
-
-**Fedora/RHEL:**
-```bash
-sudo dnf install -y gcc cmake openssl-devel pkg-config git
-sudo dnf install docker-compose-plugin
-```
-
-**macOS:**
-```bash
-brew install cmake openssl pkg-config git
-export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl/lib/pkgconfig"
-```
+It reconstructs the context, history, decisions, dependencies, and risks behind
+a codebase by indexing repositories, analyzing git history, parsing source code
+with tree-sitter, and providing evidence-based explanations powered by AI (IBM
+Bob 2.0 / OpenCode / Claude / ChatGPT).
 
 ---
 
@@ -71,38 +20,23 @@ export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl/lib/pkgconfig"
 
 ### 1. Clone and build
 
-```bash
+```sh
 git clone https://github.com/gabrielzschmitz/archaeologist.git
 cd archaeologist
 cargo build
 ```
 
-### 2. Start PostgreSQL
+### 2. Start PostgreSQL and migrate
 
-```bash
+```sh
 docker compose up -d db
-```
-
-Wait for healthy:
-```bash
-docker compose ps   # db should show "healthy"
-```
-
-### 3. Run migrations
-
-```bash
 cargo run -- migrate
 ```
 
-### 4. Index a repository
+### 3. Index a repository and query it
 
-```bash
-cargo run -- index https://github.com/rust-lang/rust
-```
-
-### 5. Query the codebase
-
-```bash
+```sh
+cargo run -- index https://github.com/rust-lang/rust # Your repository here
 cargo run -- explain main
 cargo run -- history calculate_hash
 cargo run -- search "fn process"
@@ -110,45 +44,78 @@ cargo run -- search "fn process"
 
 ---
 
-## Configuration
+## Features
 
-### Environment variables
-
-Copy `.env.example` to `.env` and edit:
-
-```bash
-cp .env.example .env
-```
-
-**Required:**
-```bash
-DATABASE_URL=postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
-```
-
-**Optional:**
-```bash
-RUST_LOG=info,sqlx=warn
-```
+- Index remote or local git repositories with full history
+- Parse source code in 8 languages (Rust, Python, JS, TS, Go, Java, C, C++)
+- Extract symbols (functions, structs, enums, traits) with line-level positions
+- Track symbol evolution across commits with blame and diff
+- Fuzzy search with pg_trgm for symbol and code search
+- Evidence aggregation with confidence scoring
+- MCP server for AI client integration (watsonx, Claude, OpenCode, ChatGPT)
+- CLI-first with REST API planned
 
 ---
 
-## CLI Commands
+## Install dependencies
 
-```bash
+<details>
+<summary><b>Arch Linux</b></summary>
+
+```sh
+sudo pacman -S rust docker docker-compose cmake openssl pkg-config base-devel git
+sudo systemctl enable --now docker
+```
+</details>
+
+<details>
+<summary><b>Ubuntu / Debian</b></summary>
+
+```sh
+sudo apt update
+sudo apt install -y build-essential pkg-config libssl-dev cmake git docker-compose-plugin
+```
+</details>
+
+<details>
+<summary><b>Fedora / RHEL</b></summary>
+
+```sh
+sudo dnf install -y gcc cmake openssl-devel pkg-config git docker-compose-plugin
+```
+</details>
+
+<details>
+<summary><b>macOS</b></summary>
+
+```sh
+brew install cmake openssl pkg-config git
+export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl/lib/pkgconfig"
+```
+</details>
+
+---
+
+## Usage
+
+```sh
 # Index a repository
 cargo run -- index <git-url> [--branch main]
 
-# Explain a symbol
+# Explain a symbol's purpose and history
 cargo run -- explain <symbol-name>
 
-# Show commit history
+# Show commit history for a symbol
 cargo run -- history <symbol-name>
 
-# Analyze impact
+# Analyze impact of changing a symbol
 cargo run -- impact <symbol-name>
 
-# Search symbols
+# Search symbols or code
 cargo run -- search "query" [--symbol-type function] [--language rust]
+
+# Start MCP server for AI clients
+cargo run -- mcp --transport stdio
 
 # Run database migrations
 cargo run -- migrate
@@ -156,164 +123,76 @@ cargo run -- migrate
 
 ---
 
-## Docker
+## Configuration
 
-### Start database only
+Copy `.env.example` to `.env`:
 
-```bash
-docker compose up -d db
+```sh
+cp .env.example .env
 ```
 
-### View logs
-
-```bash
-docker compose logs -f db
-```
-
-### Stop and clean
-
-```bash
-docker compose down -v
-```
-
-### Reset database
-
-```bash
-docker compose down -v
-docker compose up -d db
-cargo run -- migrate
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist` | PostgreSQL connection |
+| `RUST_LOG` | `info,sqlx=warn` | Log level |
+| `LLM_PROVIDER` | `watsonx` | AI provider (`watsonx`, `openai`, `anthropic`, `ollama`) |
 
 ---
 
-## Development
+<details>
+<summary><b>Database Schema</b></summary>
 
-```bash
-cargo build            # Build
-cargo build --release  # Release build
-cargo test             # Run tests
-cargo clippy           # Lint
-cargo fmt              # Format
-```
+10 tables using PostgreSQL 16 with `pg_trgm` for fuzzy search.
 
-### Database access
-
-```bash
-docker compose exec db psql -U archaeologist -d archaeologist
-```
-
----
-
-## Troubleshooting
-
-### Docker Compose V2 not found
+| Table | Description |
+|-------|-------------|
+| `repositories` | Indexed git repos |
+| `files` | Source files per repo |
+| `symbols` | Extracted symbols (functions, structs, enums, traits) |
+| `commits` | Git commits per repo |
+| `commit_files` | Files changed per commit |
+| `branches` | Git branches per repo |
+| `tags` | Git tags per repo |
+| `symbol_commits` | Links symbols to commits |
+| `symbol_dependencies` | Symbol dependency graph |
+| `evidence` | Aggregated evidence for explanations |
 
 ```
-unknown shorthand flag: 'd' in -d
+repositories ──┬── files ──────── symbols ──┬── symbol_commits ──── commits ──── commit_files
+               ├── commits                  │
+               ├── branches                 └── symbol_dependencies
+               ├── tags
+               └── evidence
 ```
 
-The `docker compose` subcommand (V2 plugin) isn't installed. Fix:
+</details>
 
-```bash
-# Arch Linux
-sudo pacman -S docker-compose
-
-# Ubuntu/Debian
-sudo apt install docker-compose-plugin
-
-# Then verify
-docker compose version
-```
-
-If you can't install the plugin, use the standalone binary:
-```bash
-docker-compose up -d db
-```
-
-### OpenSSL not found
+<details>
+<summary><b>Project Structure</b></summary>
 
 ```
-Could not find directory of OpenSSL installation
-```
-
-```bash
-# Arch Linux
-sudo pacman -S openssl pkg-config
-
-# Ubuntu/Debian
-sudo apt install libssl-dev pkg-config
-
-# macOS
-brew install openssl
-export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl/lib/pkgconfig"
-```
-
-### CMake not found
-
-```
-CMake not found
-```
-
-```bash
-# Arch Linux
-sudo pacman -S cmake
-
-# Ubuntu/Debian
-sudo apt install cmake
-
-# macOS
-brew install cmake
-```
-
-### Docker connection refused
-
-```
-Connection refused (os error 111)
-```
-
-PostgreSQL isn't running yet:
-```bash
-docker compose up -d db
-docker compose ps   # check health status
-```
-
-### cargo run: no binary found
-
-```
-error: `cargo run` could not determine which binary to run
-```
-
-The workspace has one binary (`archaeologist`). If this error occurs:
-```bash
-cargo run --bin archaeologist -- <command>
-```
-
----
-
-## Project Structure
-
-```
-ai-software-archaeologist/
+archaeologist/
 ├── Cargo.toml                  # Workspace root
 ├── compose.yaml                # Docker Compose (PostgreSQL)
 ├── Dockerfile                  # Multi-stage build
-├── .env                        # Local config (git-ignored)
 ├── .env.example                # Config template
-├── .gitignore
 ├── migrations/                 # SQL migrations (10 tables)
 ├── crates/
 │   ├── core/                   # Domain types, config, errors
 │   ├── db/                     # Database access (sqlx)
 │   ├── git/                    # Git operations (git2)
 │   ├── indexer/                 # Source code parsing (tree-sitter)
-│   ├── search/                 # Search functionality
-│   ├── evidence/               # Evidence engine
+│   ├── search/                 # Symbol and code search
+│   ├── evidence/               # Evidence aggregation engine
 │   └── cli/                    # CLI binary (clap)
 └── ROADMAPV0.md                # Implementation plan
 ```
+
+</details>
 
 ---
 
 ## License
 
-MIT
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file
+for details.
