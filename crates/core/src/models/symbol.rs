@@ -65,8 +65,7 @@ impl std::str::FromStr for SymbolType {
             "class" => Ok(Self::Class),
             "macro" => Ok(Self::Macro),
             _ => Err(crate::error::AppError::Validation(format!(
-                "Unknown symbol type: {}",
-                s
+                "Unknown symbol type: {s}"
             ))),
         }
     }

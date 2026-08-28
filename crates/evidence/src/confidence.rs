@@ -1,3 +1,6 @@
+#![allow(clippy::missing_errors_doc)]
+
+#[must_use]
 pub fn calculate_confidence(evidence_count: usize) -> String {
     match evidence_count {
         0 => "unknown".to_string(),

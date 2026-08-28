@@ -1,14 +1,16 @@
+#![allow(clippy::missing_errors_doc)]
+
 use archaeologist_core::models::{Symbol, SymbolCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 pub async fn create_symbol(pool: &PgPool, symbol: &SymbolCreate) -> Result<Symbol, sqlx::Error> {
     let record = sqlx::query_as::<_, Symbol>(
-        r#"
+        r"
         INSERT INTO symbols (file_id, repository_id, name, symbol_type, language, line_start, line_end, col_start, col_end, visibility, doc_comment, raw_text)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id, file_id, repository_id, name, symbol_type, language, line_start, line_end, col_start, col_end, visibility, doc_comment, raw_text, created_at
-        "#,
+        ",
     )
     .bind(symbol.file_id)
     .bind(symbol.repository_id)
@@ -29,11 +31,11 @@ pub async fn create_symbol(pool: &PgPool, symbol: &SymbolCreate) -> Result<Symbo
 
 pub async fn get_symbol(pool: &PgPool, id: Uuid) -> Result<Option<Symbol>, sqlx::Error> {
     let record = sqlx::query_as::<_, Symbol>(
-        r#"
+        r"
         SELECT id, file_id, repository_id, name, symbol_type, language, line_start, line_end, col_start, col_end, visibility, doc_comment, raw_text, created_at
         FROM symbols
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -49,7 +51,7 @@ pub async fn search_symbols(
     language: Option<&str>,
 ) -> Result<Vec<Symbol>, sqlx::Error> {
     let records = sqlx::query_as::<_, Symbol>(
-        r#"
+        r"
         SELECT id, file_id, repository_id, name, symbol_type, language, line_start, line_end, col_start, col_end, visibility, doc_comment, raw_text, created_at
         FROM symbols
         WHERE name ILIKE '%' || $1 || '%'
@@ -58,7 +60,7 @@ pub async fn search_symbols(
         AND ($4::TEXT IS NULL OR language = $4)
         ORDER BY name
         LIMIT 100
-        "#,
+        ",
     )
     .bind(query)
     .bind(repository_id)
@@ -71,12 +73,12 @@ pub async fn search_symbols(
 
 pub async fn list_symbols(pool: &PgPool, repository_id: Uuid) -> Result<Vec<Symbol>, sqlx::Error> {
     let records = sqlx::query_as::<_, Symbol>(
-        r#"
+        r"
         SELECT id, file_id, repository_id, name, symbol_type, language, line_start, line_end, col_start, col_end, visibility, doc_comment, raw_text, created_at
         FROM symbols
         WHERE repository_id = $1
         ORDER BY name
-        "#,
+        ",
     )
     .bind(repository_id)
     .fetch_all(pool)
@@ -86,10 +88,10 @@ pub async fn list_symbols(pool: &PgPool, repository_id: Uuid) -> Result<Vec<Symb
 
 pub async fn delete_symbol(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
     sqlx::query(
-        r#"
+        r"
         DELETE FROM symbols
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(id)
     .execute(pool)

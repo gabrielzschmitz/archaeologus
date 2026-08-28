@@ -11,6 +11,9 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    /// # Errors
+    ///
+    /// Returns an error if any required environment variable cannot be read.
     pub fn from_env() -> anyhow::Result<Self> {
         Ok(Self {
             database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {

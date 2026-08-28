@@ -1,14 +1,16 @@
+#![allow(clippy::missing_errors_doc)]
+
 use archaeologist_core::models::{Commit, CommitCreate, CommitFile, CommitFileCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 pub async fn create_commit(pool: &PgPool, commit: &CommitCreate) -> Result<Commit, sqlx::Error> {
     let record = sqlx::query_as::<_, Commit>(
-        r#"
+        r"
         INSERT INTO commits (repository_id, sha, author_name, author_email, author_date, committer_name, committer_email, committer_date, message, parent_shas)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id, repository_id, sha, author_name, author_email, author_date, committer_name, committer_email, committer_date, message, parent_shas, created_at
-        "#,
+        ",
     )
     .bind(commit.repository_id)
     .bind(&commit.sha)
@@ -27,11 +29,11 @@ pub async fn create_commit(pool: &PgPool, commit: &CommitCreate) -> Result<Commi
 
 pub async fn get_commit(pool: &PgPool, id: Uuid) -> Result<Option<Commit>, sqlx::Error> {
     let record = sqlx::query_as::<_, Commit>(
-        r#"
+        r"
         SELECT id, repository_id, sha, author_name, author_email, author_date, committer_name, committer_email, committer_date, message, parent_shas, created_at
         FROM commits
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -45,11 +47,11 @@ pub async fn get_commit_by_sha(
     sha: &str,
 ) -> Result<Option<Commit>, sqlx::Error> {
     let record = sqlx::query_as::<_, Commit>(
-        r#"
+        r"
         SELECT id, repository_id, sha, author_name, author_email, author_date, committer_name, committer_email, committer_date, message, parent_shas, created_at
         FROM commits
         WHERE repository_id = $1 AND sha = $2
-        "#,
+        ",
     )
     .bind(repository_id)
     .bind(sha)
@@ -64,13 +66,13 @@ pub async fn list_commits(
     limit: i64,
 ) -> Result<Vec<Commit>, sqlx::Error> {
     let records = sqlx::query_as::<_, Commit>(
-        r#"
+        r"
         SELECT id, repository_id, sha, author_name, author_email, author_date, committer_name, committer_email, committer_date, message, parent_shas, created_at
         FROM commits
         WHERE repository_id = $1
         ORDER BY author_date DESC
         LIMIT $2
-        "#,
+        ",
     )
     .bind(repository_id)
     .bind(limit)
@@ -84,11 +86,11 @@ pub async fn create_commit_file(
     file: &CommitFileCreate,
 ) -> Result<CommitFile, sqlx::Error> {
     let record = sqlx::query_as::<_, CommitFile>(
-        r#"
+        r"
         INSERT INTO commit_files (commit_id, file_path, status, additions, deletions, old_path)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, commit_id, file_path, status, additions, deletions, old_path
-        "#,
+        ",
     )
     .bind(file.commit_id)
     .bind(&file.file_path)
@@ -106,12 +108,12 @@ pub async fn get_commit_files(
     commit_id: Uuid,
 ) -> Result<Vec<CommitFile>, sqlx::Error> {
     let records = sqlx::query_as::<_, CommitFile>(
-        r#"
+        r"
         SELECT id, commit_id, file_path, status, additions, deletions, old_path
         FROM commit_files
         WHERE commit_id = $1
         ORDER BY file_path
-        "#,
+        ",
     )
     .bind(commit_id)
     .fetch_all(pool)

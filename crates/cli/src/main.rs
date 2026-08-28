@@ -78,50 +78,47 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Index { url, branch: _ } => {
-            info!("Indexing repository: {}", url);
+            info!("Indexing repository: {url}");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
-            println!("Repository indexed successfully: {}", url);
+            println!("Repository indexed successfully: {url}");
         }
         Commands::Ask { question } => {
-            info!("Asking: {}", question);
+            info!("Asking: {question}");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
-            println!("Answer for: {}", question);
+            println!("Answer for: {question}");
         }
         Commands::Explain { target } => {
-            info!("Explaining: {}", target);
+            info!("Explaining: {target}");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
-            println!("Explanation for: {}", target);
+            println!("Explanation for: {target}");
         }
         Commands::History { symbol } => {
-            info!("History for: {}", symbol);
+            info!("History for: {symbol}");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
-            println!("History for: {}", symbol);
+            println!("History for: {symbol}");
         }
         Commands::Impact { symbol } => {
-            info!("Impact analysis for: {}", symbol);
+            info!("Impact analysis for: {symbol}");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
-            println!("Impact analysis for: {}", symbol);
+            println!("Impact analysis for: {symbol}");
         }
         Commands::Search {
             query,
             symbol_type: _,
             language: _,
         } => {
-            info!("Searching: {}", query);
+            info!("Searching: {query}");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
-            println!("Search results for: {}", query);
+            println!("Search results for: {query}");
         }
         Commands::Mcp { transport, port } => {
-            info!(
-                "Starting MCP server (transport: {}, port: {})",
-                transport, port
-            );
+            info!("Starting MCP server (transport: {transport}, port: {port})");
             let pool = create_pool(&config.database_url).await?;
             run_migrations(&pool).await?;
             println!("MCP server started");

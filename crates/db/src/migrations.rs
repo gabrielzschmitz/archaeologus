@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use sqlx::PgPool;
 use tracing::info;
 
