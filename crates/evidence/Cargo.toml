@@ -1,0 +1,17 @@
+[package]
+name = "archaeologist-evidence"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+archaeologist-core = { workspace = true }
+archaeologist-db = { workspace = true }
+archaeologist-git = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

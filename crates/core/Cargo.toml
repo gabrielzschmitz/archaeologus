@@ -1,0 +1,17 @@
+[package]
+name = "archaeologist-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+jiff = { workspace = true }
+sqlx = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+
+[lints]
+workspace = true

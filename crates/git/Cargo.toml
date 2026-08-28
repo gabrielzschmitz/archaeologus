@@ -1,0 +1,15 @@
+[package]
+name = "archaeologist-git"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+archaeologist-core = { workspace = true }
+git2 = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true
