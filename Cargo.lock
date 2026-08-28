@@ -97,6 +97,7 @@ dependencies = [
  "archaeologist-db",
  "archaeologist-git",
  "archaeologist-indexer",
+ "archaeologist-search",
  "clap",
  "git2",
  "hex",

@@ -22,6 +22,26 @@ enum Commands {
         #[arg(short, long)]
         branch: Option<String>,
     },
+    /// Search for symbols, files, or code in indexed repositories
+    Search {
+        /// Search term (fuzzy-matched against symbol names or file paths)
+        query: String,
+        /// What to search: symbols (default), files, or code
+        #[arg(short, long, default_value = "symbols")]
+        mode: String,
+        /// Filter by symbol type (function, class, struct, …)
+        #[arg(short = 't', long)]
+        symbol_type: Option<String>,
+        /// Filter by language (rust, python, go, …)
+        #[arg(short, long)]
+        language: Option<String>,
+        /// Maximum results to show (default 20)
+        #[arg(short = 'n', long, default_value = "20")]
+        limit: i64,
+        /// Pagination offset (default 0)
+        #[arg(short, long, default_value = "0")]
+        offset: i64,
+    },
     /// Ask a question about the codebase
     Ask {
         /// Your question
@@ -41,17 +61,6 @@ enum Commands {
     Impact {
         /// Symbol name
         symbol: String,
-    },
-    /// Search for symbols in the codebase
-    Search {
-        /// Search query
-        query: String,
-        /// Symbol type filter
-        #[arg(short, long)]
-        symbol_type: Option<String>,
-        /// Language filter
-        #[arg(short, long)]
-        language: Option<String>,
     },
     /// Start MCP server for AI client connections
     Mcp {
@@ -81,6 +90,31 @@ async fn main() -> anyhow::Result<()> {
             })
             .await?;
         }
+
+        Commands::Search {
+            query,
+            mode,
+            symbol_type,
+            language,
+            limit,
+            offset,
+        } => {
+            let mode = mode
+                .parse::<commands::search::SearchMode>()
+                .unwrap_or(commands::search::SearchMode::Symbols);
+            commands::search::run(commands::search::SearchOptions {
+                query,
+                mode,
+                symbol_type,
+                language,
+                limit,
+                offset,
+                database_url: config.database_url,
+                rust_log: config.rust_log,
+            })
+            .await?;
+        }
+
         Commands::Ask { question } => {
             init_tracing(&config.rust_log);
             tracing::info!("Asking: {question}");
@@ -108,17 +142,6 @@ async fn main() -> anyhow::Result<()> {
             let pool = archaeologist_db::create_pool(&config.database_url).await?;
             archaeologist_db::run_migrations(&pool).await?;
             println!("Impact analysis for: {symbol}");
-        }
-        Commands::Search {
-            query,
-            symbol_type: _,
-            language: _,
-        } => {
-            init_tracing(&config.rust_log);
-            tracing::info!("Searching: {query}");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
-            println!("Search results for: {query}");
         }
         Commands::Mcp { transport, port } => {
             init_tracing(&config.rust_log);
