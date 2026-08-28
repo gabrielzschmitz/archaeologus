@@ -477,11 +477,11 @@ fn index_directory_progress_callback_fires() {
         Arc,
     };
 
-    let fixtures_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fixtures_dir = Path::new("/tmp/archaeologist-fixtures");
     let counter = Arc::new(AtomicUsize::new(0));
     let c = Arc::clone(&counter);
 
-    index_directory(&fixtures_dir, move |_done, _total| {
+    index_directory(fixtures_dir, move |_done, _total| {
         c.fetch_add(1, Ordering::Relaxed);
     })
     .unwrap();
