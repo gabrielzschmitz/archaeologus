@@ -6,6 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  FIXTURES_VERSION: v1.0.0
 
 jobs:
   build:
@@ -67,8 +68,11 @@ jobs:
         env:
           DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
 
+      - name: Clone test fixtures
+        run: git clone --branch "$FIXTURES_VERSION" https://github.com/arypog/fixtures.git /tmp/archaeologist-fixtures
+
       - name: Run tests
-        run: cargo test --all-targets
+        run: cargo test --workspace -- --include-ignored
         env:
           DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
 
