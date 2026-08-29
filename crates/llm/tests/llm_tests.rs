@@ -5,14 +5,11 @@
 //! builder, and provider-switching logic all work correctly.
 
 use archaeologist_llm::{
-    build_ask_prompt, system_prompt,
+    build_ask_prompt,
     config::{create_provider, LLMConfig},
     provider::{ChatMessage, LLMError, LLMProvider, ProviderType, Role},
-    providers::{
-        mock::MockProvider,
-        openai::OpenAIProvider,
-        ollama::OllamaProvider,
-    },
+    providers::{mock::MockProvider, ollama::OllamaProvider, openai::OpenAIProvider},
+    system_prompt,
 };
 use std::str::FromStr;
 
@@ -20,14 +17,26 @@ use std::str::FromStr;
 
 #[test]
 fn provider_type_parses_watsonx_aliases() {
-    assert_eq!(ProviderType::from_str("watsonx").unwrap(), ProviderType::Watsonx);
-    assert_eq!(ProviderType::from_str("ibm").unwrap(), ProviderType::Watsonx);
+    assert_eq!(
+        ProviderType::from_str("watsonx").unwrap(),
+        ProviderType::Watsonx
+    );
+    assert_eq!(
+        ProviderType::from_str("ibm").unwrap(),
+        ProviderType::Watsonx
+    );
 }
 
 #[test]
 fn provider_type_parses_openai_aliases() {
-    assert_eq!(ProviderType::from_str("openai").unwrap(), ProviderType::OpenAI);
-    assert_eq!(ProviderType::from_str("chatgpt").unwrap(), ProviderType::OpenAI);
+    assert_eq!(
+        ProviderType::from_str("openai").unwrap(),
+        ProviderType::OpenAI
+    );
+    assert_eq!(
+        ProviderType::from_str("chatgpt").unwrap(),
+        ProviderType::OpenAI
+    );
 }
 
 #[test]
@@ -36,13 +45,22 @@ fn provider_type_parses_anthropic_aliases() {
         ProviderType::from_str("anthropic").unwrap(),
         ProviderType::Anthropic
     );
-    assert_eq!(ProviderType::from_str("claude").unwrap(), ProviderType::Anthropic);
+    assert_eq!(
+        ProviderType::from_str("claude").unwrap(),
+        ProviderType::Anthropic
+    );
 }
 
 #[test]
 fn provider_type_parses_ollama_aliases() {
-    assert_eq!(ProviderType::from_str("ollama").unwrap(), ProviderType::Ollama);
-    assert_eq!(ProviderType::from_str("local").unwrap(), ProviderType::Ollama);
+    assert_eq!(
+        ProviderType::from_str("ollama").unwrap(),
+        ProviderType::Ollama
+    );
+    assert_eq!(
+        ProviderType::from_str("local").unwrap(),
+        ProviderType::Ollama
+    );
 }
 
 #[test]

@@ -138,11 +138,11 @@ async fn try_llm_answer(
     question: &str,
     contexts: &[(Symbol, Vec<EvidenceItem>, Explanation)],
 ) -> Result<String> {
-    let config = LLMConfig::from_env()
-        .context("read LLM config — set LLM_PROVIDER (default: watsonx)")?;
+    let config =
+        LLMConfig::from_env().context("read LLM config — set LLM_PROVIDER (default: watsonx)")?;
 
-    let provider = create_provider(&config)
-        .context("initialise LLM provider — check provider env vars")?;
+    let provider =
+        create_provider(&config).context("initialise LLM provider — check provider env vars")?;
 
     info!(provider = %provider.name(), "sending question to LLM");
 

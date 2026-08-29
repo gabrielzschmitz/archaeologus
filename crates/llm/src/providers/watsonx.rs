@@ -47,8 +47,8 @@ impl WatsonxProvider {
             .map_err(|_| LLMError::AuthError("WATSONX_API_KEY not set".into()))?;
         let project_id = std::env::var("WATSONX_PROJECT_ID")
             .map_err(|_| LLMError::AuthError("WATSONX_PROJECT_ID not set".into()))?;
-        let model = std::env::var("WATSONX_MODEL")
-            .unwrap_or_else(|_| "ibm/granite-4-h-small".to_string());
+        let model =
+            std::env::var("WATSONX_MODEL").unwrap_or_else(|_| "ibm/granite-4-h-small".to_string());
         let base_url = std::env::var("WATSONX_BASE_URL")
             .unwrap_or_else(|_| "https://us-south.ml.cloud.ibm.com".to_string());
 

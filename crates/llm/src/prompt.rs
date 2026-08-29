@@ -4,8 +4,9 @@
 //! context-rich messages for any [`LLMProvider`].
 
 use crate::provider::ChatMessage;
-use archaeologist_evidence::{EvidenceItem, EvidenceSource, Explanation};
 use archaeologist_core::models::Symbol;
+use archaeologist_evidence::{EvidenceItem, EvidenceSource, Explanation};
+use std::fmt::Write as _;
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ pub fn symbol_context(symbol: &Symbol) -> String {
     );
     if let Some(doc) = &symbol.doc_comment {
         if !doc.trim().is_empty() {
-            s.push_str(&format!("  Doc comment: {}\n", doc.trim()));
+            let _ = writeln!(s, "  Doc comment: {}", doc.trim());
         }
     }
     let raw = symbol.raw_text.trim();
@@ -54,7 +55,7 @@ pub fn symbol_context(symbol: &Symbol) -> String {
         } else {
             excerpt
         };
-        s.push_str(&format!("  Source excerpt: {excerpt}\n"));
+        let _ = writeln!(s, "  Source excerpt: {excerpt}");
     }
     s
 }
@@ -79,12 +80,7 @@ pub fn evidence_context(items: &[EvidenceItem]) -> String {
             .as_deref()
             .map(|r| format!(" [ref: {r}]"))
             .unwrap_or_default();
-        s.push_str(&format!(
-            "  {}. [{}]{ref_str} {}\n",
-            i + 1,
-            src_label,
-            item.content
-        ));
+        let _ = writeln!(s, "  {}. [{}]{ref_str} {}", i + 1, src_label, item.content);
     }
     s
 }
@@ -127,14 +123,15 @@ pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatM
              but note that there is no specific evidence available.\n",
         );
     } else {
-        body.push_str(&format!(
+        let _ = writeln!(
+            body,
             "The archaeologist found {} relevant symbol(s). \
-             Here is the evidence gathered for each:\n\n",
+             Here is the evidence gathered for each:\n",
             contexts.len()
-        ));
+        );
 
         for (i, ctx) in contexts.iter().enumerate() {
-            body.push_str(&format!("--- Symbol {} ---\n", i + 1));
+            let _ = writeln!(body, "--- Symbol {} ---", i + 1);
             body.push_str(&symbol_context(ctx.symbol));
             body.push_str(&explanation_context(ctx.explanation));
             body.push_str("Evidence:\n");
