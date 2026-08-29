@@ -2395,3 +2395,39 @@ LLM_PROVIDER=ollama archaeologist ask "why does this exist?"
 # IBM watsonx specific
 WATSONX_API_KEY=... WATSONX_PROJECT_ID=... cargo run -- ask "question"
 ```
+
+### MVP-11: Repository-Aware LLM Context
+
+**Goal:** Provide the LLM with richer code context and restrict searches to a specific repository
+
+**Crates:** `llm`, `search`, `cli`
+
+**Tasks:**
+
+1. Send surrounding code context for matched symbols to the LLM
+2. Include the source file containing each matched symbol
+3. Include relevant files referenced by or related to the matched symbol
+4. Include symbol metadata such as file path, line numbers, and symbol type
+5. Add configurable context size for code snippets
+6. Add `--repo` CLI option to restrict searches to a specific repository
+7. Filter search results by repository before sending context to the LLM
+8. Ensure LLM prompts clearly identify the repository associated with each context block
+9. Prevent results from other indexed repositories from being included when `--repo` is specified
+10. Update archaeologist prompt templates to use the additional code and repository context
+11. Add CLI help and documentation for `--repo`
+12. Write unit tests for context extraction and repository filtering
+13. Write integration tests covering repository-scoped LLM queries
+
+**Tests:**
+
+* Surrounding code is correctly extracted for matched symbols
+* Source files are included in LLM context
+* Related/referenced files are included when available
+* Symbol metadata is correctly rendered
+* Context size limits are respected
+* `--repo` accepts a repository identifier/path
+* Search results are restricted to the specified repository
+* No results from other repositories are included with `--repo`
+* LLM prompt contains repository and file information
+* Queries without `--repo` search across all indexed repositories
+* Repository filtering works with LLM-powered `ask` queries

@@ -21,5 +21,8 @@ pub mod provider;
 pub mod providers;
 
 pub use config::{create_provider, LLMConfig};
-pub use prompt::{build_ask_prompt, system_prompt, SymbolContext};
+pub use prompt::{
+    build_ask_prompt, deps_context, evidence_context, explanation_context, file_context,
+    repo_context, siblings_context, symbol_context, system_prompt, SymbolContext,
+};
 pub use provider::{ChatMessage, ChatResponse, LLMError, LLMProvider, Role, ToolDefinition};

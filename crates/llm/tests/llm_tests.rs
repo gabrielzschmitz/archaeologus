@@ -176,13 +176,16 @@ fn create_provider_openai_fails_without_api_key() {
 
 #[test]
 fn create_provider_anthropic_fails_without_api_key() {
+    // This test manipulates env vars; run under a mutex to avoid races.
+    use std::sync::Mutex;
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _guard = LOCK.lock().unwrap();
+
     std::env::set_var("LLM_PROVIDER", "anthropic");
-    // Temporarily unset the key and restore it afterwards.
     let saved = std::env::var("ANTHROPIC_API_KEY").ok();
     std::env::remove_var("ANTHROPIC_API_KEY");
     let cfg = LLMConfig::from_env().unwrap();
     let result = create_provider(&cfg);
-    // Restore env so we don't affect other tests.
     if let Some(k) = saved {
         std::env::set_var("ANTHROPIC_API_KEY", k);
     }
@@ -261,6 +264,69 @@ fn build_ask_prompt_has_user_role_and_question() {
 fn build_ask_prompt_no_context_mentions_no_symbols() {
     let msg = build_ask_prompt("explain this", &[]);
     assert!(msg.content.contains("No matching symbols"));
+}
+
+#[test]
+fn build_ask_prompt_with_full_context_structure() {
+    use archaeologist_llm::SymbolContext;
+    use archaeologist_evidence::{aggregate_evidence, explain_symbol};
+    use archaeologist_core::models::{Symbol, File, Repository};
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    let sym = Symbol {
+        id: Uuid::new_v4(),
+        file_id: Uuid::new_v4(),
+        repository_id: Uuid::new_v4(),
+        name: "handleRequest".to_string(),
+        symbol_type: "function".to_string(),
+        language: "go".to_string(),
+        line_start: 42,
+        line_end: 80,
+        col_start: 0,
+        col_end: 0,
+        visibility: Some("pub".to_string()),
+        doc_comment: Some("HandleRequest processes incoming HTTP requests.".to_string()),
+        raw_text: "func handleRequest(w http.ResponseWriter, r *http.Request) {}".to_string(),
+        created_at: Utc::now(),
+    };
+    let file = File {
+        id: Uuid::new_v4(),
+        repository_id: sym.repository_id,
+        path: "internal/api/handler.go".to_string(),
+        language: Some("go".to_string()),
+        size_bytes: 2048,
+        content_hash: "abc".to_string(),
+        indexed_at: Utc::now(),
+    };
+    let repo = Repository {
+        id: sym.repository_id,
+        name: "my-api".to_string(),
+        url: "https://github.com/org/my-api".to_string(),
+        local_path: None,
+        description: None,
+        default_branch: "main".to_string(),
+        indexed_at: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    let evidence = aggregate_evidence(sym.id, Some(&sym), &[], &[], &[]);
+    let expl = explain_symbol(&sym.name, &evidence);
+    let ctx = SymbolContext {
+        symbol: &sym,
+        file: Some(&file),
+        repo: Some(&repo),
+        deps: &[],
+        siblings: &[],
+        evidence: &evidence,
+        explanation: &expl,
+    };
+    let msg = build_ask_prompt("how is handleRequest used?", &[ctx]);
+    assert!(msg.content.contains("how is handleRequest used?"));
+    assert!(msg.content.contains("my-api"));
+    assert!(msg.content.contains("internal/api/handler.go"));
+    assert!(msg.content.contains("42"));
+    assert!(msg.content.contains("HandleRequest processes incoming HTTP requests."));
 }
 
 // ── ChatMessage helpers ───────────────────────────────────────────────────────

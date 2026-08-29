@@ -55,6 +55,9 @@ enum Commands {
         /// Filter by language (rust, python, go, …)
         #[arg(short, long)]
         language: Option<String>,
+        /// Restrict search to a specific indexed repository (name, URL substring, or UUID)
+        #[arg(long)]
+        repo: Option<String>,
     },
     /// Explain a symbol's purpose and history
     Explain {
@@ -140,10 +143,15 @@ async fn main() -> anyhow::Result<()> {
             .await?;
         }
 
-        Commands::Ask { question, language } => {
+        Commands::Ask {
+            question,
+            language,
+            repo,
+        } => {
             commands::ask::run(commands::ask::AskOptions {
                 question,
                 language,
+                repo,
                 database_url: config.database_url,
                 rust_log: config.rust_log,
             })

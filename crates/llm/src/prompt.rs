@@ -4,7 +4,7 @@
 //! context-rich messages for any [`LLMProvider`].
 
 use crate::provider::ChatMessage;
-use archaeologist_core::models::Symbol;
+use archaeologist_core::models::{File, Repository, Symbol, SymbolDependency};
 use archaeologist_evidence::{EvidenceItem, EvidenceSource, Explanation};
 use std::fmt::Write as _;
 
@@ -17,45 +17,117 @@ pub fn system_prompt() -> ChatMessage {
         "You are an AI Software Archaeologist. \
 Your job is to help developers understand why their codebase looks the way it does. \
 You are given structured evidence gathered from git history, source code analysis, \
-commit messages, and blame information. \
+commit messages, blame information, file locations, and dependency graphs. \
 \n\n\
 Constraints:\n\
 - Only reason from the evidence provided. Do NOT invent facts.\n\
 - If confidence is low, say so clearly.\n\
-- Cite commit SHAs or file references when they are available in the evidence.\n\
+- Cite commit SHAs or file:line references when available.\n\
 - Be concise: lead with the key insight, then support it with evidence.\n\
-- Prefer factual git archaeology over speculation.\n\
 - When multiple symbols are relevant, address each one.\n\
-- Format your response in plain text (no markdown, no headers with #).",
+- Format your response in plain text (no markdown headers with #).",
     )
 }
 
 // ── Context builders ──────────────────────────────────────────────────────────
 
-/// Build a compact context block from a single [`Symbol`].
+/// Build a compact context block describing the repository a symbol lives in.
 #[must_use]
-pub fn symbol_context(symbol: &Symbol) -> String {
+pub fn repo_context(repo: &Repository) -> String {
+    let mut s = format!("Repository: {} ({})\n", repo.name, repo.url);
+    if let Some(desc) = &repo.description {
+        if !desc.trim().is_empty() {
+            let _ = writeln!(s, "  Description: {}", desc.trim());
+        }
+    }
+    s
+}
+
+/// Build a compact context block describing the source file.
+#[must_use]
+pub fn file_context(file: &File) -> String {
+    format!(
+        "File: {} ({})\n",
+        file.path,
+        file.language.as_deref().unwrap_or("unknown language"),
+    )
+}
+
+/// Build a context block from a single [`Symbol`].
+///
+/// Shows: name, type, language, visibility, doc-comment, full source text
+/// with line-number anchors, and the file:line location.
+#[must_use]
+pub fn symbol_context(symbol: &Symbol, file: Option<&File>) -> String {
+    let location = file.map_or_else(
+        || format!("lines {}-{}", symbol.line_start, symbol.line_end),
+        |f| {
+            format!(
+                "{}:{}-{}",
+                f.path, symbol.line_start, symbol.line_end
+            )
+        },
+    );
+
     let mut s = format!(
-        "Symbol: `{}` ({} {}, {})\n",
+        "Symbol: `{}` ({} {}, {}) at {}\n",
         symbol.name,
         symbol.language,
         symbol.symbol_type,
-        symbol.visibility.as_deref().unwrap_or("unknown visibility")
+        symbol.visibility.as_deref().unwrap_or("unknown visibility"),
+        location,
     );
+
     if let Some(doc) = &symbol.doc_comment {
         if !doc.trim().is_empty() {
             let _ = writeln!(s, "  Doc comment: {}", doc.trim());
         }
     }
+
     let raw = symbol.raw_text.trim();
     if !raw.is_empty() {
-        let excerpt: String = raw.chars().take(300).collect();
-        let excerpt = if raw.len() > 300 {
+        // Show up to 600 chars — enough for a full small function/struct.
+        let limit = 600;
+        let excerpt: String = raw.chars().take(limit).collect();
+        let excerpt = if raw.chars().count() > limit {
             format!("{excerpt}…")
         } else {
             excerpt
         };
-        let _ = writeln!(s, "  Source excerpt: {excerpt}");
+        let _ = writeln!(s, "  Source code:\n{excerpt}");
+    }
+    s
+}
+
+/// Build a context block listing symbol dependencies.
+#[must_use]
+pub fn deps_context(deps: &[SymbolDependency]) -> String {
+    if deps.is_empty() {
+        return String::new();
+    }
+    let mut s = "  Dependencies:\n".to_string();
+    for d in deps.iter().take(20) {
+        let _ = writeln!(s, "    - {} ({})", d.dependency_name, d.dependency_type);
+    }
+    s
+}
+
+/// Build a context block listing sibling symbols defined in the same file.
+///
+/// These are the other symbols living alongside the matched symbol, giving
+/// the LLM a "neighbourhood" view of what the file does.
+#[must_use]
+pub fn siblings_context(siblings: &[Symbol]) -> String {
+    if siblings.is_empty() {
+        return String::new();
+    }
+    let mut s = "  Other symbols in the same file:\n".to_string();
+    for sib in siblings.iter().take(15) {
+        let _ = writeln!(
+            s,
+            "    - `{}` ({} {}) lines {}-{}",
+            sib.name, sib.language, sib.symbol_type, sib.line_start, sib.line_end
+        );
     }
     s
 }
@@ -98,20 +170,29 @@ pub fn explanation_context(explanation: &Explanation) -> String {
 
 // ── Ask prompt builder ────────────────────────────────────────────────────────
 
-/// Context gathered for a single symbol to include in the `ask` prompt.
+/// All context gathered for a single matched symbol, to include in the prompt.
 pub struct SymbolContext<'a> {
+    /// The matched symbol itself.
     pub symbol: &'a Symbol,
+    /// The file the symbol lives in (fetched from DB).
+    pub file: Option<&'a File>,
+    /// The repository the symbol belongs to (fetched from DB).
+    pub repo: Option<&'a Repository>,
+    /// Dependency edges recorded for this symbol.
+    pub deps: &'a [SymbolDependency],
+    /// Other symbols defined in the same source file.
+    pub siblings: &'a [Symbol],
+    /// Ranked evidence items (commits, blame, code, DB).
     pub evidence: &'a [EvidenceItem],
+    /// Pre-computed rule-based explanation.
     pub explanation: &'a Explanation,
 }
 
 /// Build the full user message for the `ask` command.
 ///
-/// Includes:
-/// - The natural-language question
-/// - Symbol metadata (name, language, type, doc, code excerpt) for each hit
-/// - All evidence items (commit messages, blame, code)
-/// - The pre-computed summary/confidence from the evidence engine
+/// Packs the question plus — for each matched symbol — its repository, file
+/// path, full source text, line numbers, doc-comment, dependency names,
+/// sibling symbol list, all evidence items, and the pre-computed summary.
 #[must_use]
 pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatMessage {
     let mut body = format!("Question: {question}\n\n");
@@ -126,22 +207,48 @@ pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatM
         let _ = writeln!(
             body,
             "The archaeologist found {} relevant symbol(s). \
-             Here is the evidence gathered for each:\n",
+             Here is all gathered context:\n",
             contexts.len()
         );
 
         for (i, ctx) in contexts.iter().enumerate() {
-            let _ = writeln!(body, "--- Symbol {} ---", i + 1);
-            body.push_str(&symbol_context(ctx.symbol));
+            let _ = writeln!(body, "═══ Symbol {} ═══", i + 1);
+
+            // Repository & file
+            if let Some(repo) = ctx.repo {
+                body.push_str(&repo_context(repo));
+            }
+            if let Some(file) = ctx.file {
+                body.push_str(&file_context(file));
+            }
+
+            // Symbol detail (name, type, location, full source)
+            body.push_str(&symbol_context(ctx.symbol, ctx.file));
+
+            // Dependencies
+            let dep_block = deps_context(ctx.deps);
+            if !dep_block.is_empty() {
+                body.push_str(&dep_block);
+            }
+
+            // Sibling symbols in the same file
+            let sib_block = siblings_context(ctx.siblings);
+            if !sib_block.is_empty() {
+                body.push_str(&sib_block);
+            }
+
+            // Pre-computed summary
             body.push_str(&explanation_context(ctx.explanation));
+
+            // Evidence
             body.push_str("Evidence:\n");
             body.push_str(&evidence_context(ctx.evidence));
             body.push('\n');
         }
 
         body.push_str(
-            "Using only the evidence above, answer the question. \
-             Be specific and cite commit SHAs or source references where available.",
+            "Using only the context and evidence above, answer the question. \
+             Be specific and cite file paths, line numbers, or commit SHAs where available.",
         );
     }
 
@@ -153,7 +260,7 @@ pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatM
 #[cfg(test)]
 mod tests {
     use super::*;
-    use archaeologist_core::models::Symbol;
+    use archaeologist_core::models::{File, Repository, Symbol, SymbolDependency};
     use archaeologist_evidence::{EvidenceItem, EvidenceSource};
     use chrono::Utc;
     use uuid::Uuid;
@@ -177,6 +284,42 @@ mod tests {
         }
     }
 
+    fn make_file(path: &str) -> File {
+        File {
+            id: Uuid::new_v4(),
+            repository_id: Uuid::new_v4(),
+            path: path.to_string(),
+            language: Some("rust".to_string()),
+            size_bytes: 512,
+            content_hash: "abc".to_string(),
+            indexed_at: Utc::now(),
+        }
+    }
+
+    fn make_repo(name: &str) -> Repository {
+        Repository {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            url: format!("https://github.com/org/{name}"),
+            local_path: None,
+            description: Some("A test repository".to_string()),
+            default_branch: "main".to_string(),
+            indexed_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn make_dep(name: &str, dep_type: &str) -> SymbolDependency {
+        SymbolDependency {
+            id: Uuid::new_v4(),
+            symbol_id: Uuid::new_v4(),
+            depends_on_symbol_id: None,
+            dependency_name: name.to_string(),
+            dependency_type: dep_type.to_string(),
+        }
+    }
+
     fn make_evidence_item(source: EvidenceSource, content: &str) -> EvidenceItem {
         EvidenceItem {
             source,
@@ -195,24 +338,79 @@ mod tests {
     }
 
     #[test]
-    fn symbol_context_includes_name_and_language() {
-        let sym = make_symbol(
-            "authenticate",
-            Some("Validates credentials."),
-            "fn authenticate() {}",
-        );
-        let ctx = symbol_context(&sym);
+    fn symbol_context_includes_name_language_and_location() {
+        let sym = make_symbol("authenticate", Some("Validates credentials."), "fn authenticate() {}");
+        let file = make_file("src/auth.rs");
+        let ctx = symbol_context(&sym, Some(&file));
         assert!(ctx.contains("authenticate"));
         assert!(ctx.contains("rust"));
         assert!(ctx.contains("Validates credentials."));
+        assert!(ctx.contains("src/auth.rs"));
+        assert!(ctx.contains("fn authenticate()"));
+    }
+
+    #[test]
+    fn symbol_context_no_file_uses_line_numbers() {
+        let sym = make_symbol("foo", None, "fn foo() {}");
+        let ctx = symbol_context(&sym, None);
+        assert!(ctx.contains("lines 1-10"));
     }
 
     #[test]
     fn symbol_context_truncates_long_raw_text() {
-        let long = "x".repeat(400);
+        let long = "x".repeat(800);
         let sym = make_symbol("big_fn", None, &long);
-        let ctx = symbol_context(&sym);
+        let ctx = symbol_context(&sym, None);
         assert!(ctx.contains('…'));
+    }
+
+    #[test]
+    fn repo_context_includes_name_and_url() {
+        let repo = make_repo("my-service");
+        let ctx = repo_context(&repo);
+        assert!(ctx.contains("my-service"));
+        assert!(ctx.contains("github.com/org/my-service"));
+    }
+
+    #[test]
+    fn file_context_includes_path() {
+        let file = make_file("internal/user/user.go");
+        let ctx = file_context(&file);
+        assert!(ctx.contains("internal/user/user.go"));
+    }
+
+    #[test]
+    fn deps_context_empty_returns_empty_string() {
+        assert_eq!(deps_context(&[]), "");
+    }
+
+    #[test]
+    fn deps_context_lists_dependencies() {
+        let deps = vec![
+            make_dep("fmt", "import"),
+            make_dep("io.Writer", "call"),
+        ];
+        let ctx = deps_context(&deps);
+        assert!(ctx.contains("fmt"));
+        assert!(ctx.contains("io.Writer"));
+        assert!(ctx.contains("import"));
+        assert!(ctx.contains("call"));
+    }
+
+    #[test]
+    fn siblings_context_empty_returns_empty_string() {
+        assert_eq!(siblings_context(&[]), "");
+    }
+
+    #[test]
+    fn siblings_context_lists_names() {
+        let siblings = vec![
+            make_symbol("NewUser", None, "func NewUser() {}"),
+            make_symbol("DeleteUser", None, "func DeleteUser() {}"),
+        ];
+        let ctx = siblings_context(&siblings);
+        assert!(ctx.contains("NewUser"));
+        assert!(ctx.contains("DeleteUser"));
     }
 
     #[test]
@@ -234,19 +432,27 @@ mod tests {
     }
 
     #[test]
-    fn build_ask_prompt_contains_question() {
+    fn build_ask_prompt_contains_question_and_repo() {
         use archaeologist_evidence::{aggregate_evidence, explain_symbol};
         let sym = make_symbol("retry", None, "fn retry() {}");
+        let file = make_file("src/retry.rs");
+        let repo = make_repo("my-service");
         let evidence = aggregate_evidence(sym.id, Some(&sym), &[], &[], &[]);
         let expl = explain_symbol(&sym.name, &evidence);
         let contexts = vec![SymbolContext {
             symbol: &sym,
+            file: Some(&file),
+            repo: Some(&repo),
+            deps: &[],
+            siblings: &[],
             evidence: &evidence,
             explanation: &expl,
         }];
         let msg = build_ask_prompt("why does retry exist?", &contexts);
         assert!(msg.content.contains("why does retry exist?"));
         assert!(msg.content.contains("retry"));
+        assert!(msg.content.contains("my-service"));
+        assert!(msg.content.contains("src/retry.rs"));
     }
 
     #[test]
