@@ -1,15 +1,13 @@
 use axum::{
-    Json, Router,
     extract::{Path, State},
     routing::get,
+    Json, Router,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use archaeologist_core::models::{Commit, Symbol, SymbolCommit, SymbolDependency};
-use archaeologist_db::repositories::{
-    commit_repository, graph_repository, symbol_repository,
-};
+use archaeologist_db::repositories::{commit_repository, graph_repository, symbol_repository};
 
 use crate::{
     error::{ApiError, ApiResult},
@@ -18,7 +16,10 @@ use crate::{
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/repositories/{repo_id}/symbols", get(list_symbols_for_repo))
+        .route(
+            "/repositories/{repo_id}/symbols",
+            get(list_symbols_for_repo),
+        )
         .route("/symbols/{id}", get(get_symbol))
         .route("/symbols/{id}/history", get(get_symbol_history))
         .route("/symbols/{id}/impact", get(get_symbol_impact))
@@ -26,7 +27,7 @@ pub fn router() -> Router<AppState> {
 
 // ── GET /repositories/:repo_id/symbols ───────────────────────────────────────
 
-/// GET /repositories/:repo_id/symbols — list all symbols in a repository.
+/// GET `/repositories/:repo_id/symbols` — list all symbols in a repository.
 #[utoipa::path(
     get,
     path = "/repositories/{repo_id}/symbols",
@@ -66,10 +67,7 @@ async fn list_symbols_for_repo(
     ),
     tag = "symbols"
 )]
-async fn get_symbol(
-    State(pool): State<PgPool>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<Symbol>> {
+async fn get_symbol(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> ApiResult<Json<Symbol>> {
     let symbol = symbol_repository::get_symbol(&pool, id)
         .await
         .map_err(ApiError::from)?

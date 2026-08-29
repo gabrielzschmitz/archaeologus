@@ -1,7 +1,7 @@
 use axum::{
-    Json, Router,
     extract::{Query, State},
     routing::get,
+    Json, Router,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -30,7 +30,7 @@ pub struct EvidenceParams {
     pub repository_id: Option<Uuid>,
 }
 
-/// GET /evidence?symbol_id=... — retrieve evidence records.
+/// GET `/evidence?symbol_id=...` — retrieve evidence records.
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct EvidenceResponse {
     pub items: Vec<Evidence>,
@@ -53,16 +53,12 @@ async fn get_evidence(
     Query(params): Query<EvidenceParams>,
 ) -> ApiResult<Json<EvidenceResponse>> {
     let items: Vec<Evidence> = match (params.symbol_id, params.repository_id) {
-        (Some(symbol_id), _) => {
-            evidence_repository::get_evidence_for_symbol(&pool, symbol_id)
-                .await
-                .map_err(ApiError::from)?
-        }
-        (None, Some(repo_id)) => {
-            evidence_repository::get_evidence_for_repository(&pool, repo_id)
-                .await
-                .map_err(ApiError::from)?
-        }
+        (Some(symbol_id), _) => evidence_repository::get_evidence_for_symbol(&pool, symbol_id)
+            .await
+            .map_err(ApiError::from)?,
+        (None, Some(repo_id)) => evidence_repository::get_evidence_for_repository(&pool, repo_id)
+            .await
+            .map_err(ApiError::from)?,
         (None, None) => {
             return Err(ApiError::BadRequest(
                 "at least one of `symbol_id` or `repository_id` must be provided".into(),

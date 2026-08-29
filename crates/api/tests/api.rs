@@ -19,8 +19,8 @@ use axum::{
 use http_body_util::BodyExt;
 use sqlx::PgPool;
 use tower::ServiceExt;
-use uuid::Uuid;
 use utoipa::OpenApi;
+use uuid::Uuid;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -116,9 +116,7 @@ async fn swagger_ui_root_is_reachable() {
         .expect("lazy pool creation failed");
     let app = build_app(pool);
 
-    let req = Request::get("/swagger-ui/")
-        .body(Body::empty())
-        .unwrap();
+    let req = Request::get("/swagger-ui/").body(Body::empty()).unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     assert!(
@@ -280,8 +278,7 @@ async fn evidence_unknown_repo_returns_empty() {
     skip_if_no_db!(pool);
     let app = build_app(pool);
 
-    let (status, body) =
-        get(&app, &format!("/evidence?repository_id={}", Uuid::new_v4())).await;
+    let (status, body) = get(&app, &format!("/evidence?repository_id={}", Uuid::new_v4())).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["items"].as_array().unwrap().len(), 0);
 }

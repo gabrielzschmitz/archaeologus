@@ -1,8 +1,8 @@
 use axum::{
-    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::get,
+    Json, Router,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -19,7 +19,10 @@ use crate::{
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/repositories", get(list_repositories).post(create_repository))
+        .route(
+            "/repositories",
+            get(list_repositories).post(create_repository),
+        )
         .route("/repositories/{id}", get(get_repository))
 }
 
@@ -32,9 +35,7 @@ pub fn router() -> Router<AppState> {
     ),
     tag = "repositories"
 )]
-async fn list_repositories(
-    State(pool): State<PgPool>,
-) -> ApiResult<Json<Vec<Repository>>> {
+async fn list_repositories(State(pool): State<PgPool>) -> ApiResult<Json<Vec<Repository>>> {
     let repos = repo_repository::list_repositories(&pool)
         .await
         .map_err(ApiError::from)?;

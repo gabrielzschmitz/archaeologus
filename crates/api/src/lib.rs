@@ -1,4 +1,4 @@
-//! `archaeologist-api` — Axum HTTP server with OpenAPI / Swagger UI.
+//! `archaeologist-api` — Axum HTTP server with `OpenAPI` / Swagger UI.
 //!
 //! # Quick start
 //! ```no_run
@@ -38,7 +38,6 @@ pub async fn serve(pool: sqlx::PgPool, addr: &str) -> anyhow::Result<()> {
 }
 
 /// Construct the full [`Router`] (useful in tests).
-#[must_use]
 pub fn build_router(state: AppState) -> Router {
     use tower_http::cors::CorsLayer;
     use tower_http::trace::TraceLayer;

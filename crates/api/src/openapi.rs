@@ -1,6 +1,6 @@
+use axum::Router;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use axum::Router;
 
 use crate::{
     error::ErrorBody,
@@ -18,7 +18,7 @@ use archaeologist_core::models::{
     Commit, CommitFile, Evidence, Repository, Symbol, SymbolCommit, SymbolDependency,
 };
 
-/// The top-level OpenAPI document for archaeologist-api.
+/// The top-level `OpenAPI` document for archaeologist-api.
 #[derive(OpenApi)]
 #[openapi(
     info(
