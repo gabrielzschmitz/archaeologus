@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{rejection::QueryRejection, Query, State},
     routing::get,
     Json, Router,
 };
@@ -77,8 +77,11 @@ impl From<SearchResult> for SearchResponse {
 )]
 async fn search(
     State(pool): State<PgPool>,
-    Query(params): Query<SearchParams>,
+    params: Result<Query<SearchParams>, QueryRejection>,
 ) -> ApiResult<Json<SearchResponse>> {
+    let Query(params) =
+        params.map_err(|_| ApiError::BadRequest("invalid or missing query parameters".into()))?;
+
     if params.q.trim().is_empty() {
         return Err(ApiError::BadRequest(
             "query parameter `q` must not be empty".into(),
