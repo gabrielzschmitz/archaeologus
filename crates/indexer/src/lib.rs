@@ -1,9 +1,9 @@
-//! `archaeologist-indexer` — parallel source-code indexing crate.
+//! `archaeologus-indexer` — parallel source-code indexing crate.
 //!
 //! # Quick start
 //! ```no_run
 //! use std::path::Path;
-//! use archaeologist_indexer::index_directory;
+//! use archaeologus_indexer::index_directory;
 //!
 //! let results = index_directory(Path::new("src"), |done, total| {
 //!     eprintln!("{done}/{total}");

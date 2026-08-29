@@ -1,14 +1,14 @@
-//! Tests for `archaeologist-search`.
+//! Tests for `archaeologus-search`.
 //!
 //! Unit tests cover the query builder (no DB needed).
 //! Integration tests that require a live PostgreSQL database are marked
 //! `#[ignore]` and can be run with:
 //!
 //! ```text
-//! cargo test -p archaeologist-search -- --ignored
+//! cargo test -p archaeologus-search -- --ignored
 //! ```
 
-use archaeologist_search::{
+use archaeologus_search::{
     code_search::{CodeQuery, CodeSearchResult},
     symbol_search::{SymbolQuery, SymbolSearchResult},
 };
@@ -118,7 +118,7 @@ fn code_query_offset_clamped() {
 
 #[test]
 fn search_mode_parse_symbols() {
-    use archaeologist_cli_search_mode_test::SearchMode;
+    use archaeologus_cli_search_mode_test::SearchMode;
     assert_eq!(
         "symbols".parse::<SearchMode>().unwrap(),
         SearchMode::Symbols
@@ -128,20 +128,20 @@ fn search_mode_parse_symbols() {
 
 #[test]
 fn search_mode_parse_files() {
-    use archaeologist_cli_search_mode_test::SearchMode;
+    use archaeologus_cli_search_mode_test::SearchMode;
     assert_eq!("files".parse::<SearchMode>().unwrap(), SearchMode::Files);
     assert_eq!("file".parse::<SearchMode>().unwrap(), SearchMode::Files);
 }
 
 #[test]
 fn search_mode_parse_code() {
-    use archaeologist_cli_search_mode_test::SearchMode;
+    use archaeologus_cli_search_mode_test::SearchMode;
     assert_eq!("code".parse::<SearchMode>().unwrap(), SearchMode::Code);
 }
 
 #[test]
 fn search_mode_parse_invalid_errors() {
-    use archaeologist_cli_search_mode_test::SearchMode;
+    use archaeologus_cli_search_mode_test::SearchMode;
     assert!("unknown".parse::<SearchMode>().is_err());
 }
 
@@ -210,7 +210,7 @@ fn underscore_query_is_pattern() {
 // We re-export SearchMode for testing without making it pub(crate) in the cli.
 // The real SearchMode lives in commands::search — we test the parsing logic
 // inline here using a thin mirror type.
-mod archaeologist_cli_search_mode_test {
+mod archaeologus_cli_search_mode_test {
     #[derive(Debug, PartialEq, Eq)]
     pub enum SearchMode {
         Symbols,

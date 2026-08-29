@@ -1,10 +1,10 @@
 [package]
-name = "archaeologist-git"
+name = "archaeologus-git"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-archaeologist-core = { workspace = true }
+archaeologus-core = { workspace = true }
 git2 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

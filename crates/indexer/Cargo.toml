@@ -1,10 +1,10 @@
 [package]
-name = "archaeologist-indexer"
+name = "archaeologus-indexer"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-archaeologist-core = { workspace = true }
+archaeologus-core = { workspace = true }
 tree-sitter = { workspace = true }
 tree-sitter-rust = { workspace = true }
 tree-sitter-python = { workspace = true }

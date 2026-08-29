@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use archaeologist_core::models::{Branch, BranchCreate, Tag, TagCreate};
+use archaeologus_core::models::{Branch, BranchCreate, Tag, TagCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 

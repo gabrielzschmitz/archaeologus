@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use archaeologist_core::models::{File, FileCreate};
+use archaeologus_core::models::{File, FileCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 

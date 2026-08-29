@@ -1,4 +1,4 @@
-//! `archaeologist-llm` — LLM provider abstraction.
+//! `archaeologus-llm` — LLM provider abstraction.
 //!
 //! Provides a unified [`LLMProvider`] trait over multiple AI backends.
 //! IBM watsonx is the primary provider (P0) for the hackathon.
@@ -6,9 +6,9 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use archaeologist_llm::config::{LLMConfig, create_provider};
+//! use archaeologus_llm::config::{LLMConfig, create_provider};
 //!
-//! # async fn example() -> Result<(), archaeologist_llm::provider::LLMError> {
+//! # async fn example() -> Result<(), archaeologus_llm::provider::LLMError> {
 //! let config = LLMConfig::from_env()?;
 //! let provider = create_provider(&config)?;
 //! # Ok(())

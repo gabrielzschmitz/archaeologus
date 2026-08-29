@@ -16,13 +16,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: archaeologist
-          POSTGRES_PASSWORD: archaeologist_dev
-          POSTGRES_DB: archaeologist
+          POSTGRES_USER: archaeologus
+          POSTGRES_PASSWORD: archaeologus_dev
+          POSTGRES_DB: archaeologus
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U archaeologist -d archaeologist"
+          --health-cmd "pg_isready -U archaeologus -d archaeologus"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -61,20 +61,20 @@ jobs:
       - name: Build
         run: cargo build --all-targets
         env:
-          DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
+          DATABASE_URL: postgres://archaeologus:archaeologus_dev@localhost:5432/archaeologus
 
       - name: Run migrations
         run: cargo run -- migrate
         env:
-          DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
+          DATABASE_URL: postgres://archaeologus:archaeologus_dev@localhost:5432/archaeologus
 
       - name: Clone test fixtures
-        run: git clone --branch "$FIXTURES_VERSION" https://github.com/arypog/fixtures.git /tmp/archaeologist-fixtures
+        run: git clone --branch "$FIXTURES_VERSION" https://github.com/arypog/fixtures.git /tmp/archaeologus-fixtures
 
       - name: Run tests
         run: cargo test --workspace -- --include-ignored
         env:
-          DATABASE_URL: postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist
+          DATABASE_URL: postgres://archaeologus:archaeologus_dev@localhost:5432/archaeologus
 
       - name: Build release
         run: cargo build --release

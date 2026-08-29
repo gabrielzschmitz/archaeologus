@@ -1,11 +1,11 @@
 [package]
-name = "archaeologist-search"
+name = "archaeologus-search"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-archaeologist-core = { workspace = true }
-archaeologist-db = { workspace = true }
+archaeologus-core = { workspace = true }
+archaeologus-db = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

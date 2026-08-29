@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use archaeologist_core::models::{Evidence, EvidenceCreate};
+use archaeologus_core::models::{Evidence, EvidenceCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 

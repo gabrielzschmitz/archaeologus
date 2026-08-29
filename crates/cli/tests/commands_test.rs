@@ -7,7 +7,7 @@
 // ── `ask` command ─────────────────────────────────────────────────────────────
 
 mod ask_tests {
-    use archaeologist_cli::commands::ask::extract_keywords;
+    use archaeologus_cli::commands::ask::extract_keywords;
 
     #[test]
     fn question_with_symbol_name_extracted() {
@@ -66,8 +66,8 @@ mod ask_tests {
 // ── `impact` command ──────────────────────────────────────────────────────────
 
 mod impact_tests {
-    use archaeologist_cli::commands::impact::{estimate_risk, is_test_symbol};
-    use archaeologist_core::models::Symbol;
+    use archaeologus_cli::commands::impact::{estimate_risk, is_test_symbol};
+    use archaeologus_core::models::Symbol;
     use chrono::Utc;
     use uuid::Uuid;
 

@@ -1,4 +1,4 @@
-//! Integration tests for archaeologist-indexer.
+//! Integration tests for archaeologus-indexer.
 //!
 //! Uses the fixture files in `tests/fixtures/` (cloned from
 //! <https://github.com/arypog/fixtures.git>).  The bash script
@@ -6,12 +6,12 @@
 
 use std::path::Path;
 
-use archaeologist_indexer::{
+use archaeologus_indexer::{
     build_graph, detect_language, extract_dependencies, extract_symbols, index_directory, parse,
     parse_incremental, DependencyKind, Lang, SymbolKind,
 };
 
-const FIXTURES_DIR: &str = "/tmp/archaeologist-fixtures";
+const FIXTURES_DIR: &str = "/tmp/archaeologus-fixtures";
 
 fn fixture(lang: &str, file: &str) -> std::path::PathBuf {
     Path::new(FIXTURES_DIR).join(lang).join(file)
@@ -21,12 +21,12 @@ fn read_fixture(lang: &str, file: &str) -> Vec<u8> {
     std::fs::read(fixture(lang, file)).expect("fixture file must exist")
 }
 
-fn sym_names(syms: &[archaeologist_indexer::ExtractedSymbol]) -> Vec<&str> {
+fn sym_names(syms: &[archaeologus_indexer::ExtractedSymbol]) -> Vec<&str> {
     syms.iter().map(|s| s.name.as_str()).collect()
 }
 
 fn has_sym_kind(
-    syms: &[archaeologist_indexer::ExtractedSymbol],
+    syms: &[archaeologus_indexer::ExtractedSymbol],
     name: &str,
     kind: &SymbolKind,
 ) -> bool {
@@ -442,7 +442,7 @@ fn build_graph_groups_all_under_file_key() {
 
 #[test]
 fn index_directory_indexes_all_8_languages_skips_sh() {
-    let fixtures_dir = Path::new("/tmp/archaeologist-fixtures");
+    let fixtures_dir = Path::new("/tmp/archaeologus-fixtures");
 
     let results = index_directory(fixtures_dir, |_done, _total| {
         // callback fires on rayon threads; just verify it doesn't panic
@@ -477,7 +477,7 @@ fn index_directory_progress_callback_fires() {
         Arc,
     };
 
-    let fixtures_dir = Path::new("/tmp/archaeologist-fixtures");
+    let fixtures_dir = Path::new("/tmp/archaeologus-fixtures");
     let counter = Arc::new(AtomicUsize::new(0));
     let c = Arc::clone(&counter);
 
@@ -601,7 +601,7 @@ fn deps_go_import_names_are_clean_paths() {
 /// No dependency name across any fixture file should contain a raw newline character.
 #[test]
 fn no_dependency_name_contains_newline() {
-    let fixtures_dir = std::path::Path::new("/tmp/archaeologist-fixtures");
+    let fixtures_dir = std::path::Path::new("/tmp/archaeologus-fixtures");
     let results = index_directory(fixtures_dir, |_, _| {}).expect("index should succeed");
     for indexed in &results {
         for dep in &indexed.dependencies {

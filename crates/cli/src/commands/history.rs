@@ -2,12 +2,12 @@
 //! information, and a summary of how the symbol evolved over time.
 
 use anyhow::{Context, Result};
-use archaeologist_db::{
+use archaeologus_db::{
     create_pool,
     repositories::{get_commit, list_symbol_commits},
     run_migrations,
 };
-use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
+use archaeologus_search::symbol_search::{search_symbols, SymbolQuery};
 use tracing::info;
 
 /// Options for the `history` sub-command.
@@ -46,7 +46,7 @@ pub async fn run(opts: HistoryOptions) -> Result<()> {
 
     if result.items.is_empty() {
         println!("No symbol matching {:?} found.", opts.symbol);
-        println!("Tip: index a repository first with `archaeologist index <path>`.");
+        println!("Tip: index a repository first with `archaeologus index <path>`.");
         return Ok(());
     }
 

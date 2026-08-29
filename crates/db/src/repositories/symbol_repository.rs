@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use archaeologist_core::models::{Symbol, SymbolCreate};
+use archaeologus_core::models::{Symbol, SymbolCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 

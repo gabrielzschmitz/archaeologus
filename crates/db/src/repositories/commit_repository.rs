@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use archaeologist_core::models::{Commit, CommitCreate, CommitFile, CommitFileCreate};
+use archaeologus_core::models::{Commit, CommitCreate, CommitFile, CommitFileCreate};
 use sqlx::PgPool;
 use uuid::Uuid;
 

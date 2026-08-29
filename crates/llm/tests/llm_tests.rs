@@ -1,10 +1,10 @@
-//! Integration tests for the `archaeologist-llm` crate.
+//! Integration tests for the `archaeologus-llm` crate.
 //!
 //! These tests use the [`MockProvider`] to avoid real network calls, and also
 //! verify that provider initialization from environment variables, the prompt
 //! builder, and provider-switching logic all work correctly.
 
-use archaeologist_llm::{
+use archaeologus_llm::{
     build_ask_prompt,
     config::{create_provider, LLMConfig},
     provider::{ChatMessage, LLMError, LLMProvider, ProviderType, Role},
@@ -265,7 +265,7 @@ fn ollama_provider_new_stores_fields() {
 fn system_prompt_has_system_role() {
     let msg = system_prompt();
     assert_eq!(msg.role, Role::System);
-    assert!(msg.content.contains("Archaeologist"));
+    assert!(msg.content.contains("Archaeologus"));
 }
 
 #[test]
@@ -283,9 +283,9 @@ fn build_ask_prompt_no_context_mentions_no_symbols() {
 
 #[test]
 fn build_ask_prompt_with_full_context_structure() {
-    use archaeologist_core::models::{File, Repository, Symbol};
-    use archaeologist_evidence::{aggregate_evidence, explain_symbol};
-    use archaeologist_llm::SymbolContext;
+    use archaeologus_core::models::{File, Repository, Symbol};
+    use archaeologus_evidence::{aggregate_evidence, explain_symbol};
+    use archaeologus_llm::SymbolContext;
     use chrono::Utc;
     use uuid::Uuid;
 

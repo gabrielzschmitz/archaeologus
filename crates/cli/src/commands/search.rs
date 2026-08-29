@@ -1,8 +1,8 @@
 //! `search` command — query indexed symbols and files.
 
 use anyhow::{Context, Result};
-use archaeologist_db::{create_pool, run_migrations};
-use archaeologist_search::{
+use archaeologus_db::{create_pool, run_migrations};
+use archaeologus_search::{
     code_search::{search_code, search_files, CodeQuery},
     symbol_search::{search_symbols, SymbolQuery},
 };

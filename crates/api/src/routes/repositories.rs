@@ -9,8 +9,8 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use archaeologist_core::models::{Repository, RepositoryCreate};
-use archaeologist_db::repositories::repo_repository;
+use archaeologus_core::models::{Repository, RepositoryCreate};
+use archaeologus_db::repositories::repo_repository;
 
 use crate::{
     error::{ApiError, ApiResult},

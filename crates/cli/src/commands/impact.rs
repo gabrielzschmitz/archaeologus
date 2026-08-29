@@ -7,9 +7,9 @@
 //! * A risk estimate based on caller count and test coverage
 
 use anyhow::{Context, Result};
-use archaeologist_core::models::Symbol;
-use archaeologist_db::{create_pool, run_migrations, PgPool};
-use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
+use archaeologus_core::models::Symbol;
+use archaeologus_db::{create_pool, run_migrations, PgPool};
+use archaeologus_search::symbol_search::{search_symbols, SymbolQuery};
 use tracing::info;
 use uuid::Uuid;
 
@@ -49,7 +49,7 @@ pub async fn run(opts: ImpactOptions) -> Result<()> {
 
     if result.items.is_empty() {
         println!("No symbol matching {:?} found.", opts.symbol);
-        println!("Tip: index a repository first with `archaeologist index <path>`.");
+        println!("Tip: index a repository first with `archaeologus index <path>`.");
         return Ok(());
     }
 
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn test_symbol_detection_by_name_prefix() {
         use chrono::Utc;
-        let sym = archaeologist_core::models::Symbol {
+        let sym = archaeologus_core::models::Symbol {
             id: uuid::Uuid::new_v4(),
             file_id: uuid::Uuid::new_v4(),
             repository_id: uuid::Uuid::new_v4(),
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn test_symbol_detection_by_name_suffix() {
         use chrono::Utc;
-        let sym = archaeologist_core::models::Symbol {
+        let sym = archaeologus_core::models::Symbol {
             id: uuid::Uuid::new_v4(),
             file_id: uuid::Uuid::new_v4(),
             repository_id: uuid::Uuid::new_v4(),
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn non_test_symbol_not_detected() {
         use chrono::Utc;
-        let sym = archaeologist_core::models::Symbol {
+        let sym = archaeologus_core::models::Symbol {
             id: uuid::Uuid::new_v4(),
             file_id: uuid::Uuid::new_v4(),
             repository_id: uuid::Uuid::new_v4(),

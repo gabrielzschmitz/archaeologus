@@ -104,14 +104,14 @@ fn local_path_is_not_detected_as_url() {
 #[test]
 fn indexer_finds_rust_symbols_in_local_repo() {
     let repo_dir = make_rust_repo();
-    let results = archaeologist_indexer::index_directory(repo_dir.path(), |_, _| {})
+    let results = archaeologus_indexer::index_directory(repo_dir.path(), |_, _| {})
         .expect("index_directory should succeed");
 
     assert!(!results.is_empty(), "should find at least one file");
 
     let rust_file = results
         .iter()
-        .find(|f| f.language == archaeologist_indexer::Lang::Rust)
+        .find(|f| f.language == archaeologus_indexer::Lang::Rust)
         .expect("should find a Rust file");
 
     // We expect Greeter struct, Greeter impl, new + greet functions, and add.
@@ -135,7 +135,7 @@ fn indexer_finds_rust_symbols_in_local_repo() {
 #[test]
 fn indexer_handles_empty_directory() {
     let empty = TempDir::new().unwrap();
-    let results = archaeologist_indexer::index_directory(empty.path(), |_, _| {})
+    let results = archaeologus_indexer::index_directory(empty.path(), |_, _| {})
         .expect("index_directory on empty dir should succeed");
     assert!(results.is_empty());
 }
@@ -144,9 +144,9 @@ fn indexer_handles_empty_directory() {
 /// walkdir on a missing dir returns no entries.
 #[test]
 fn indexer_handles_nonexistent_path_gracefully() {
-    let nonexistent = std::path::Path::new("/tmp/archaeologist-nonexistent-test-12345");
+    let nonexistent = std::path::Path::new("/tmp/archaeologus-nonexistent-test-12345");
     // index_directory uses walkdir which silently yields nothing for a missing dir
-    let results = archaeologist_indexer::index_directory(nonexistent, |_, _| {});
+    let results = archaeologus_indexer::index_directory(nonexistent, |_, _| {});
     // Either Ok(empty) or an error is acceptable — no panic.
     if let Ok(v) = results {
         assert!(v.is_empty());
@@ -163,34 +163,31 @@ fn clone_local_file_url_and_index() {
     let dest = dest_dir.path().join("clone");
 
     let url = format!("file://{}", src_dir.path().display());
-    let cloned = archaeologist_git::clone_repository(
-        &url,
-        &dest,
-        archaeologist_git::CloneOptions::default(),
-    )
-    .expect("clone should succeed");
+    let cloned =
+        archaeologus_git::clone_repository(&url, &dest, archaeologus_git::CloneOptions::default())
+            .expect("clone should succeed");
 
     assert!(cloned.join(".git").exists());
 
     // Index the clone.
     let results =
-        archaeologist_indexer::index_directory(&cloned, |_, _| {}).expect("index cloned repo");
+        archaeologus_indexer::index_directory(&cloned, |_, _| {}).expect("index cloned repo");
     assert!(!results.is_empty());
 }
 
-// ── Mock-remote path: /tmp/archaeologist-fixtures ────────────────────────────
+// ── Mock-remote path: /tmp/archaeologus-fixtures ────────────────────────────
 
 /// Index the project's local fixture repository (the mock "remote").
 #[test]
 fn index_fixtures_repository() {
-    let fixtures = std::path::Path::new("/tmp/archaeologist-fixtures");
+    let fixtures = std::path::Path::new("/tmp/archaeologus-fixtures");
     if !fixtures.exists() {
         // Skip when the fixture repo is absent (e.g. clean CI machine).
-        eprintln!("skipping: /tmp/archaeologist-fixtures not found");
+        eprintln!("skipping: /tmp/archaeologus-fixtures not found");
         return;
     }
 
-    let results = archaeologist_indexer::index_directory(fixtures, |done, total| {
+    let results = archaeologus_indexer::index_directory(fixtures, |done, total| {
         if total > 0 {
             let _ = (done, total);
         }
@@ -237,7 +234,7 @@ fn different_content_produces_different_hash() {
 /// Every `SymbolKind` variant maps to a valid `SymbolType` without panicking.
 #[test]
 fn all_symbol_kinds_map_without_panic() {
-    use archaeologist_indexer::SymbolKind;
+    use archaeologus_indexer::SymbolKind;
 
     let kinds = [
         SymbolKind::Function,
@@ -256,7 +253,7 @@ fn all_symbol_kinds_map_without_panic() {
     for kind in &kinds {
         // The mapping lives in commands::index but its logic is simple; we
         // replicate it here so the test has no dependency on internal fns.
-        use archaeologist_core::models::SymbolType;
+        use archaeologus_core::models::SymbolType;
         let _mapped: SymbolType = match kind {
             SymbolKind::Function => SymbolType::Function,
             SymbolKind::Constructor => SymbolType::Constructor,
@@ -280,7 +277,7 @@ fn all_symbol_kinds_map_without_panic() {
 fn list_branches_finds_default_branch() {
     let repo_dir = make_rust_repo();
     let branches =
-        archaeologist_git::list_branches(repo_dir.path()).expect("list_branches should succeed");
+        archaeologus_git::list_branches(repo_dir.path()).expect("list_branches should succeed");
 
     assert!(!branches.is_empty(), "should find at least one branch");
     // Every branch must have a non-empty name and SHA.
@@ -297,7 +294,7 @@ fn list_branches_finds_default_branch() {
 #[test]
 fn list_branches_on_non_repo_returns_error() {
     let dir = TempDir::new().unwrap();
-    assert!(archaeologist_git::list_branches(dir.path()).is_err());
+    assert!(archaeologus_git::list_branches(dir.path()).is_err());
 }
 
 /// After cloning a repo that has multiple branches, `list_branches` sees all
@@ -340,11 +337,11 @@ fn list_branches_includes_remote_tracking_branches() {
     let dest_dir = TempDir::new().unwrap();
     let dest = dest_dir.path().join("clone");
     let url = format!("file://{}", src_dir.path().display());
-    archaeologist_git::clone_repository(&url, &dest, archaeologist_git::CloneOptions::default())
+    archaeologus_git::clone_repository(&url, &dest, archaeologus_git::CloneOptions::default())
         .expect("clone should succeed");
 
     // list_branches on the clone should see both branches.
-    let branches = archaeologist_git::list_branches(&dest).expect("list_branches should succeed");
+    let branches = archaeologus_git::list_branches(&dest).expect("list_branches should succeed");
     let names: std::collections::HashSet<String> =
         branches.iter().map(|b| b.name.clone()).collect();
 
@@ -363,7 +360,7 @@ fn list_branches_includes_remote_tracking_branches() {
 #[test]
 fn list_tags_empty_for_fresh_repo() {
     let repo_dir = make_rust_repo();
-    let tags = archaeologist_git::list_tags(repo_dir.path()).expect("list_tags should succeed");
+    let tags = archaeologus_git::list_tags(repo_dir.path()).expect("list_tags should succeed");
     assert!(tags.is_empty());
 }
 
@@ -378,7 +375,7 @@ fn list_tags_finds_lightweight_tag() {
     let obj = repo.find_object(head, None).unwrap();
     repo.tag_lightweight("v0.1.0", &obj, false).unwrap();
 
-    let tags = archaeologist_git::list_tags(repo_dir.path()).expect("list_tags should succeed");
+    let tags = archaeologus_git::list_tags(repo_dir.path()).expect("list_tags should succeed");
     assert_eq!(tags.len(), 1);
     assert_eq!(tags[0].name, "v0.1.0");
     assert!(!tags[0].target_sha.is_empty());
@@ -389,13 +386,13 @@ fn list_tags_finds_lightweight_tag() {
 /// `diff_commit` on the initial commit reports the file as added.
 #[test]
 fn diff_commit_reports_initial_file_as_added() {
-    use archaeologist_git::FileStatus;
+    use archaeologus_git::FileStatus;
 
     let repo_dir = make_rust_repo();
     let repo = git2::Repository::open(repo_dir.path()).unwrap();
     let head_sha = repo.head().unwrap().target().unwrap().to_string();
 
-    let diff = archaeologist_git::diff_commit(repo_dir.path(), &head_sha)
+    let diff = archaeologus_git::diff_commit(repo_dir.path(), &head_sha)
         .expect("diff_commit should succeed");
 
     assert!(!diff.is_empty(), "diff should have at least one file");
@@ -412,7 +409,7 @@ fn diff_commit_reports_initial_file_as_added() {
 fn diff_commit_invalid_sha_returns_error() {
     let repo_dir = make_rust_repo();
     let result =
-        archaeologist_git::diff_commit(repo_dir.path(), "0000000000000000000000000000000000000000");
+        archaeologus_git::diff_commit(repo_dir.path(), "0000000000000000000000000000000000000000");
     assert!(result.is_err());
 }
 
@@ -436,11 +433,11 @@ fn main() {
     )
     .unwrap();
 
-    let results = archaeologist_indexer::index_directory(dir.path(), |_, _| {})
-        .expect("index should succeed");
+    let results =
+        archaeologus_indexer::index_directory(dir.path(), |_, _| {}).expect("index should succeed");
     let file = results
         .iter()
-        .find(|f| f.language == archaeologist_indexer::Lang::Rust)
+        .find(|f| f.language == archaeologus_indexer::Lang::Rust)
         .expect("should find Rust file");
 
     assert!(!file.dependencies.is_empty(), "should extract dependencies");
@@ -448,7 +445,7 @@ fn main() {
     let has_import = file
         .dependencies
         .iter()
-        .any(|d| d.kind == archaeologist_indexer::DependencyKind::Import);
+        .any(|d| d.kind == archaeologus_indexer::DependencyKind::Import);
     assert!(has_import, "should detect use declarations as imports");
 }
 
@@ -459,7 +456,7 @@ fn main() {
 fn walk_commits_finds_initial_commit() {
     let repo_dir = make_rust_repo();
     let commits =
-        archaeologist_git::walk_commits(repo_dir.path(), &archaeologist_git::WalkFilter::default())
+        archaeologus_git::walk_commits(repo_dir.path(), &archaeologus_git::WalkFilter::default())
             .expect("walk_commits should succeed");
 
     assert_eq!(commits.len(), 1);
@@ -471,9 +468,7 @@ fn walk_commits_finds_initial_commit() {
 #[test]
 fn walk_commits_on_non_repo_returns_error() {
     let not_a_repo = TempDir::new().unwrap();
-    let result = archaeologist_git::walk_commits(
-        not_a_repo.path(),
-        &archaeologist_git::WalkFilter::default(),
-    );
+    let result =
+        archaeologus_git::walk_commits(not_a_repo.path(), &archaeologus_git::WalkFilter::default());
     assert!(result.is_err());
 }

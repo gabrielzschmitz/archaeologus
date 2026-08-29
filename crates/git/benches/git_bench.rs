@@ -2,7 +2,7 @@ use std::path::Path;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
-use archaeologist_git::{blame_file, diff_commit, walk_commits, WalkFilter};
+use archaeologus_git::{blame_file, diff_commit, walk_commits, WalkFilter};
 use tempfile::TempDir;
 
 fn build_repo(n: usize) -> TempDir {

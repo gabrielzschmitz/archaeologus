@@ -1,18 +1,18 @@
-# AI Software Archaeologist
+# Archaeologus
 
-<!-- <img align="right" width="192px" src="./resources/icons/icon.svg" alt="Archaeologist Logo"> -->
+<!-- <img align="right" width="192px" src="./resources/icons/icon.svg" alt="Archaeologus Logo"> -->
 
 <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 <a href="https://www.buymeacoffee.com/gabrielzschmitz" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 20px !important;width: 87px;" ></a>
-<a href="https://github.com/gabrielzschmitz/archaeologist"><img src="https://img.shields.io/github/stars/gabrielzschmitz/archaeologist?style=social" alt="Give me a Star"></a>
+<a href="https://github.com/gabrielzschmitz/archaeologus"><img src="https://img.shields.io/github/stars/gabrielzschmitz/archaeologus?style=social" alt="Give me a Star"></a>
 
-**AI Software Archaeologist** answers the question: *"Why is the code like
+**Archaeologus** answers the question: *"Why is the code like
 this?"*
 
 It reconstructs the context, history, decisions, dependencies, and risks behind
 a codebase by indexing repositories, analyzing git history, parsing source code
-with tree-sitter, and providing evidence-based explanations powered by AI (IBM
-Bob 2.0 / OpenCode / Claude / ChatGPT).
+with tree-sitter, and providing evidence-based explanations powered by your
+choice of LLM (IBM watsonx.ai by default, plus OpenAI, Anthropic, or Ollama).
 
 ---
 
@@ -21,8 +21,8 @@ Bob 2.0 / OpenCode / Claude / ChatGPT).
 ### 1. Clone and build
 
 ```sh
-git clone https://github.com/gabrielzschmitz/archaeologist.git
-cd archaeologist
+git clone https://github.com/gabrielzschmitz/archaeologus.git
+cd archaeologus
 cargo build
 ```
 
@@ -53,7 +53,10 @@ cargo run -- search "fn process"
 - Fuzzy search with pg_trgm for symbol and code search
 - Evidence aggregation with confidence scoring
 - MCP server for AI client integration (watsonx, Claude, OpenCode, ChatGPT)
-- CLI-first with REST API planned
+- Ask-anything `ask` command that answers questions about the codebase with
+  cited evidence
+- REST API with OpenAPI/Swagger docs
+- CLI-first, with the same engine exposed over the MCP protocol and HTTP
 
 ---
 
@@ -114,8 +117,14 @@ cargo run -- impact <symbol-name>
 # Search symbols or code
 cargo run -- search "query" [--symbol-type function] [--language rust]
 
+# Ask a question about the codebase (LLM-powered; falls back to rule-based)
+cargo run -- ask "why does this function exist?"
+
 # Start MCP server for AI clients
 cargo run -- mcp --transport stdio
+
+# Start the REST API (OpenAPI/Swagger at /docs)
+cargo run -- serve
 
 # Run database migrations
 cargo run -- migrate
@@ -133,7 +142,7 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist` | PostgreSQL connection |
+| `DATABASE_URL` | `postgres://archaeologus:archaeologus_dev@localhost:5432/archaeologus` | PostgreSQL connection |
 | `RUST_LOG` | `info,sqlx=warn` | Log level |
 | `LLM_PROVIDER` | `watsonx` | AI provider (`watsonx`, `openai`, `anthropic`, `ollama`) |
 
@@ -171,21 +180,23 @@ repositories ──┬── files ──────── symbols ──┬─
 <summary><b>Project Structure</b></summary>
 
 ```
-archaeologist/
+archaeologus/
 ├── Cargo.toml                  # Workspace root
 ├── compose.yaml                # Docker Compose (PostgreSQL)
 ├── Dockerfile                  # Multi-stage build
 ├── .env.example                # Config template
 ├── migrations/                 # SQL migrations (10 tables)
-├── crates/
-│   ├── core/                   # Domain types, config, errors
-│   ├── db/                     # Database access (sqlx)
-│   ├── git/                    # Git operations (git2)
-│   ├── indexer/                 # Source code parsing (tree-sitter)
-│   ├── search/                 # Symbol and code search
-│   ├── evidence/               # Evidence aggregation engine
-│   └── cli/                    # CLI binary (clap)
-└── ROADMAPV0.md                # Implementation plan
+└── crates/
+    ├── core/                   # Domain types, config, errors
+    ├── db/                     # Database access (sqlx)
+    ├── git/                    # Git operations (git2)
+    ├── indexer/                # Source code parsing (tree-sitter)
+    ├── search/                 # Symbol and code search
+    ├── evidence/               # Evidence aggregation engine
+    ├── llm/                    # LLM provider abstraction (watsonx, OpenAI, …)
+    ├── api/                    # REST API (Axum, OpenAPI/Swagger)
+    ├── mcp/                    # MCP server exposing tools to AI clients
+    └── cli/                    # CLI binary (clap)
 ```
 
 </details>

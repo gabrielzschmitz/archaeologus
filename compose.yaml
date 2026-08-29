@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: archaeologist
-      POSTGRES_PASSWORD: archaeologist_dev
-      POSTGRES_DB: archaeologist
+      POSTGRES_USER: archaeologus
+      POSTGRES_PASSWORD: archaeologus_dev
+      POSTGRES_DB: archaeologus
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U archaeologist -d archaeologist"]
+      test: ["CMD-SHELL", "pg_isready -U archaeologus -d archaeologus"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,7 +23,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://archaeologist:archaeologist_dev@db:5432/archaeologist
+      DATABASE_URL: postgres://archaeologus:archaeologus_dev@db:5432/archaeologus
       RUST_LOG: info
     depends_on:
       db:

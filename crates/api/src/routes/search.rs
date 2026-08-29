@@ -8,8 +8,8 @@ use sqlx::PgPool;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use archaeologist_core::models::Symbol;
-use archaeologist_search::symbol_search::{SymbolQuery, SymbolSearchResult as SearchResult};
+use archaeologus_core::models::Symbol;
+use archaeologus_search::symbol_search::{SymbolQuery, SymbolSearchResult as SearchResult};
 
 use crate::{
     error::{ApiError, ApiResult},
@@ -108,7 +108,7 @@ async fn search(
         q
     };
 
-    let result = archaeologist_search::symbol_search::search_symbols(&pool, &q)
+    let result = archaeologus_search::symbol_search::search_symbols(&pool, &q)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 

@@ -1,15 +1,15 @@
 [package]
-name = "archaeologist-mcp"
+name = "archaeologus-mcp"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-archaeologist-core = { workspace = true }
-archaeologist-db = { workspace = true }
-archaeologist-git = { workspace = true }
-archaeologist-indexer = { workspace = true }
-archaeologist-search = { workspace = true }
-archaeologist-evidence = { workspace = true }
+archaeologus-core = { workspace = true }
+archaeologus-db = { workspace = true }
+archaeologus-git = { workspace = true }
+archaeologus-indexer = { workspace = true }
+archaeologus-search = { workspace = true }
+archaeologus-evidence = { workspace = true }
 
 rmcp = { workspace = true }
 schemars = { workspace = true }

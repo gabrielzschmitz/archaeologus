@@ -1,11 +1,11 @@
-//! `archaeologist-evidence` — evidence aggregation, confidence scoring, and
+//! `archaeologus-evidence` — evidence aggregation, confidence scoring, and
 //! human-readable explanation generation.
 //!
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use archaeologist_evidence::aggregator::aggregate_evidence;
-//! use archaeologist_evidence::explainer::explain_symbol;
+//! use archaeologus_evidence::aggregator::aggregate_evidence;
+//! use archaeologus_evidence::explainer::explain_symbol;
 //! use uuid::Uuid;
 //!
 //! let items = aggregate_evidence(Uuid::new_v4(), None, &[], &[], &[]);

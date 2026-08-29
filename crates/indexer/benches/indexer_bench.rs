@@ -1,4 +1,4 @@
-//! Benchmarks for archaeologist-indexer.
+//! Benchmarks for archaeologus-indexer.
 //!
 //! Measures:
 //! - Full parse throughput per language for 1k / 10k / 100k lines
@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
-use archaeologist_indexer::{extract_symbols, parse, Lang};
+use archaeologus_indexer::{extract_symbols, parse, Lang};
 
 fn gen_rust(n: usize) -> Vec<u8> {
     let mut src = String::new();

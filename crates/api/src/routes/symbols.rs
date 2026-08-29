@@ -6,8 +6,8 @@ use axum::{
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use archaeologist_core::models::{Commit, Symbol, SymbolCommit, SymbolDependency};
-use archaeologist_db::repositories::{commit_repository, graph_repository, symbol_repository};
+use archaeologus_core::models::{Commit, Symbol, SymbolCommit, SymbolDependency};
+use archaeologus_db::repositories::{commit_repository, graph_repository, symbol_repository};
 
 use crate::{
     error::{ApiError, ApiResult},
@@ -43,7 +43,7 @@ async fn list_symbols_for_repo(
     Path(repo_id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<Symbol>>> {
     // Verify repository exists
-    archaeologist_db::repositories::repo_repository::get_repository(&pool, repo_id)
+    archaeologus_db::repositories::repo_repository::get_repository(&pool, repo_id)
         .await
         .map_err(ApiError::from)?
         .ok_or_else(|| ApiError::NotFound(format!("repository {repo_id} not found")))?;

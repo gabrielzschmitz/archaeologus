@@ -28,11 +28,11 @@ impl From<sqlx::Error> for ApiError {
     }
 }
 
-impl From<archaeologist_core::AppError> for ApiError {
-    fn from(e: archaeologist_core::AppError) -> Self {
+impl From<archaeologus_core::AppError> for ApiError {
+    fn from(e: archaeologus_core::AppError) -> Self {
         match e {
-            archaeologist_core::AppError::NotFound(msg) => Self::NotFound(msg),
-            archaeologist_core::AppError::Validation(msg) => Self::BadRequest(msg),
+            archaeologus_core::AppError::NotFound(msg) => Self::NotFound(msg),
+            archaeologus_core::AppError::Validation(msg) => Self::BadRequest(msg),
             other => Self::Internal(other.to_string()),
         }
     }

@@ -8,8 +8,8 @@ use sqlx::PgPool;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use archaeologist_core::models::Evidence;
-use archaeologist_db::repositories::evidence_repository;
+use archaeologus_core::models::Evidence;
+use archaeologus_db::repositories::evidence_repository;
 
 use crate::{
     error::{ApiError, ApiResult},

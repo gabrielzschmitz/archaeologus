@@ -1,11 +1,11 @@
-//! Prompt templates for archaeologist queries.
+//! Prompt templates for archaeologus queries.
 //!
 //! These templates are used by the CLI `ask` command to construct
 //! context-rich messages for any [`LLMProvider`].
 
 use crate::provider::ChatMessage;
-use archaeologist_core::models::{File, Repository, Symbol, SymbolDependency};
-use archaeologist_evidence::{EvidenceItem, EvidenceSource, Explanation};
+use archaeologus_core::models::{File, Repository, Symbol, SymbolDependency};
+use archaeologus_evidence::{EvidenceItem, EvidenceSource, Explanation};
 use std::fmt::Write as _;
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -14,7 +14,7 @@ use std::fmt::Write as _;
 #[must_use]
 pub fn system_prompt() -> ChatMessage {
     ChatMessage::system(
-        "You are an AI Software Archaeologist. \
+        "You are an AI Software Archaeologus. \
 Your job is to help developers understand why their codebase looks the way it does. \
 You are given structured evidence gathered from git history, source code analysis, \
 commit messages, blame information, file locations, and dependency graphs. \
@@ -229,7 +229,7 @@ pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatM
     } else {
         let _ = writeln!(
             body,
-            "The archaeologist found {} relevant symbol(s). \
+            "The archaeologus found {} relevant symbol(s). \
              Here is all gathered context:\n",
             contexts.len()
         );
@@ -283,8 +283,8 @@ pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatM
 #[cfg(test)]
 mod tests {
     use super::*;
-    use archaeologist_core::models::{File, Repository, Symbol, SymbolDependency};
-    use archaeologist_evidence::{EvidenceItem, EvidenceSource};
+    use archaeologus_core::models::{File, Repository, Symbol, SymbolDependency};
+    use archaeologus_evidence::{EvidenceItem, EvidenceSource};
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -357,7 +357,7 @@ mod tests {
         use crate::provider::Role;
         let msg = system_prompt();
         assert_eq!(msg.role, Role::System);
-        assert!(msg.content.contains("Software Archaeologist"));
+        assert!(msg.content.contains("Software Archaeologus"));
     }
 
     #[test]
@@ -466,7 +466,7 @@ mod tests {
 
     #[test]
     fn build_ask_prompt_contains_question_and_repo() {
-        use archaeologist_evidence::{aggregate_evidence, explain_symbol};
+        use archaeologus_evidence::{aggregate_evidence, explain_symbol};
         let sym = make_symbol("retry", None, "fn retry() {}");
         let file = make_file("src/retry.rs");
         let repo = make_repo("my-service");

@@ -1,5 +1,5 @@
-use archaeologist_cli::commands;
-use archaeologist_core::AppConfig;
+use archaeologus_cli::commands;
+use archaeologus_core::AppConfig;
 use clap::{Parser, Subcommand};
 
 // Load `.env` before anything reads env vars.
@@ -10,8 +10,8 @@ fn load_dotenv() {
 }
 
 #[derive(Parser)]
-#[command(name = "archaeologist")]
-#[command(about = "AI Software Archaeologist - answers 'why is the code like this?'")]
+#[command(name = "archaeologus")]
+#[command(about = "AI Software Archaeologus - answers 'why is the code like this?'")]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]
@@ -187,21 +187,21 @@ async fn main() -> anyhow::Result<()> {
         Commands::Mcp { transport, port } => {
             init_tracing(&config.rust_log);
             tracing::info!("Starting MCP server (transport={transport}, port={port})");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
+            let pool = archaeologus_db::create_pool(&config.database_url).await?;
+            archaeologus_db::run_migrations(&pool).await?;
             run_mcp_server(pool, &transport, port).await?;
         }
         Commands::Serve { addr } => {
             init_tracing(&config.rust_log);
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
-            archaeologist_api::serve(pool, &addr).await?;
+            let pool = archaeologus_db::create_pool(&config.database_url).await?;
+            archaeologus_db::run_migrations(&pool).await?;
+            archaeologus_api::serve(pool, &addr).await?;
         }
         Commands::Migrate => {
             init_tracing(&config.rust_log);
             tracing::info!("Running migrations...");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
+            let pool = archaeologus_db::create_pool(&config.database_url).await?;
+            archaeologus_db::run_migrations(&pool).await?;
             println!("Migrations completed");
         }
     }
@@ -217,14 +217,14 @@ fn init_tracing(filter: &str) {
 }
 
 async fn run_mcp_server(
-    pool: archaeologist_db::PgPool,
+    pool: archaeologus_db::PgPool,
     transport: &str,
     port: u16,
 ) -> anyhow::Result<()> {
-    use archaeologist_mcp::ArchaeologistServer;
+    use archaeologus_mcp::ArchaeologusServer;
     use rmcp::ServiceExt;
 
-    let server = ArchaeologistServer::new(pool);
+    let server = ArchaeologusServer::new(pool);
 
     match transport {
         "stdio" => {
@@ -244,7 +244,7 @@ async fn run_mcp_server(
 
             let pool = server.pool.clone();
             let mcp_service = StreamableHttpService::new(
-                move || Ok(ArchaeologistServer::new(pool.clone())),
+                move || Ok(ArchaeologusServer::new(pool.clone())),
                 Arc::new(LocalSessionManager::default()),
                 StreamableHttpServerConfig::default(),
             );

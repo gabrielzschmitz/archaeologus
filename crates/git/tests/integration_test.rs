@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use archaeologist_git::{
+use archaeologus_git::{
     blame_file, clone_repository, diff_commit, walk_commits, CloneOptions, FileStatus, WalkFilter,
 };
 use tempfile::TempDir;

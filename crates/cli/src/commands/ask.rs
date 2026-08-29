@@ -12,17 +12,17 @@
 //!    Falls back to the plain rule-based explainer if no LLM is configured.
 
 use anyhow::{Context, Result};
-use archaeologist_core::models::{File, Repository, Symbol, SymbolDependency};
-use archaeologist_db::{
+use archaeologus_core::models::{File, Repository, Symbol, SymbolDependency};
+use archaeologus_db::{
     create_pool, repositories::get_commit, repositories::get_evidence_for_symbol,
     repositories::get_file, repositories::get_repository, repositories::list_repositories,
     repositories::list_symbol_commits, repositories::list_symbol_dependencies, run_migrations,
 };
-use archaeologist_evidence::{aggregate_evidence, explain_symbol, EvidenceItem, Explanation};
-use archaeologist_llm::{
+use archaeologus_evidence::{aggregate_evidence, explain_symbol, EvidenceItem, Explanation};
+use archaeologus_llm::{
     build_ask_prompt, create_provider, system_prompt, LLMConfig, SymbolContext,
 };
-use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
+use archaeologus_search::symbol_search::{search_symbols, SymbolQuery};
 use sqlx::PgPool;
 use tracing::info;
 use uuid::Uuid;
@@ -89,7 +89,7 @@ pub async fn run(opts: AskOptions) -> Result<()> {
                 "Tip: check that the repository is indexed and --repo matches its name or URL."
             );
         } else {
-            println!("Tip: index a repository first with `archaeologist index <path>`.");
+            println!("Tip: index a repository first with `archaeologus index <path>`.");
         }
     }
 
@@ -111,7 +111,7 @@ pub async fn run(opts: AskOptions) -> Result<()> {
             if bundles.is_empty() {
                 println!(
                     "No evidence found. Index a repository first with \
-                     `archaeologist index <path>`."
+                     `archaeologus index <path>`."
                 );
             }
         }

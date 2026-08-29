@@ -1,12 +1,12 @@
 [package]
-name = "archaeologist-evidence"
+name = "archaeologus-evidence"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-archaeologist-core = { workspace = true }
-archaeologist-db = { workspace = true }
-archaeologist-git = { workspace = true }
+archaeologus-core = { workspace = true }
+archaeologus-db = { workspace = true }
+archaeologus-git = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

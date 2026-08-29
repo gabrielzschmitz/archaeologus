@@ -14,16 +14,16 @@ use crate::{
     state::AppState,
 };
 
-use archaeologist_core::models::{
+use archaeologus_core::models::{
     Commit, CommitFile, Evidence, Repository, Symbol, SymbolCommit, SymbolDependency,
 };
 
-/// The top-level `OpenAPI` document for archaeologist-api.
+/// The top-level `OpenAPI` document for archaeologus-api.
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "AI Software Archaeologist API",
-        description = "REST API for the AI Software Archaeologist — answers 'why is the code like this?'",
+        title = "AI Software Archaeologus API",
+        description = "REST API for the AI Software Archaeologus — answers 'why is the code like this?'",
         version = "0.1.0",
         license(name = "MIT"),
     ),

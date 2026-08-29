@@ -6,12 +6,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use archaeologist_core::models::{
+use archaeologus_core::models::{
     BranchCreate, CommitCreate, CommitFileCreate, FileCreate, RepositoryCreate, SymbolCommitCreate,
     SymbolCreate, SymbolDependencyCreate, TagCreate,
 };
-use archaeologist_db::PgPool;
-use archaeologist_db::{
+use archaeologus_db::PgPool;
+use archaeologus_db::{
     create_pool,
     repositories::{
         create_commit, create_commit_file, create_file, create_repository,
@@ -20,10 +20,10 @@ use archaeologist_db::{
     },
     run_migrations,
 };
-use archaeologist_git::{
+use archaeologus_git::{
     clone_repository, diff_commit, list_branches, list_tags, walk_commits, CloneOptions, WalkFilter,
 };
-use archaeologist_indexer::{index_directory, languages::Lang, IndexedFile};
+use archaeologus_indexer::{index_directory, languages::Lang, IndexedFile};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -384,8 +384,8 @@ async fn store_symbol_commits(
                 };
 
             let change_type = match df.status {
-                archaeologist_git::FileStatus::Added => "added",
-                archaeologist_git::FileStatus::Deleted => "deleted",
+                archaeologus_git::FileStatus::Added => "added",
+                archaeologus_git::FileStatus::Deleted => "deleted",
                 _ => "modified",
             };
 
@@ -572,9 +572,9 @@ async fn store_symbol_dependencies(
                 .map_or(fallback_sym_id, |(id, _, _)| *id);
 
             let dep_type = match dep.kind {
-                archaeologist_indexer::DependencyKind::Import => "import",
-                archaeologist_indexer::DependencyKind::Call => "call",
-                archaeologist_indexer::DependencyKind::TraitImpl => "trait_impl",
+                archaeologus_indexer::DependencyKind::Import => "import",
+                archaeologus_indexer::DependencyKind::Call => "call",
+                archaeologus_indexer::DependencyKind::TraitImpl => "trait_impl",
             };
 
             let target = dep.target.trim();
@@ -602,7 +602,7 @@ async fn store_symbol_dependencies(
 fn resolve_path(target: &str) -> Result<(PathBuf, String)> {
     let is_url = target.contains("://") || target.starts_with("git@");
     if is_url {
-        let cache_dir = PathBuf::from("/tmp/archaeologist-cache");
+        let cache_dir = PathBuf::from("/tmp/archaeologus-cache");
         std::fs::create_dir_all(&cache_dir).context("create cache dir")?;
 
         let slug = target
@@ -636,7 +636,7 @@ async fn upsert_repository(
     url: &str,
     local_path: &Path,
     branch: Option<&String>,
-) -> Result<archaeologist_core::models::Repository> {
+) -> Result<archaeologus_core::models::Repository> {
     if let Some(existing) = get_repository_by_url(pool, url)
         .await
         .context("look up repository")?
@@ -673,10 +673,10 @@ fn lang_str(lang: Lang) -> &'static str {
 }
 
 fn indexer_kind_to_core(
-    kind: &archaeologist_indexer::SymbolKind,
-) -> archaeologist_core::models::SymbolType {
-    use archaeologist_core::models::SymbolType;
-    use archaeologist_indexer::SymbolKind;
+    kind: &archaeologus_indexer::SymbolKind,
+) -> archaeologus_core::models::SymbolType {
+    use archaeologus_core::models::SymbolType;
+    use archaeologus_indexer::SymbolKind;
     match kind {
         SymbolKind::Function => SymbolType::Function,
         SymbolKind::Constructor => SymbolType::Constructor,

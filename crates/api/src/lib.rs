@@ -1,8 +1,8 @@
-//! `archaeologist-api` — Axum HTTP server with `OpenAPI` / Swagger UI.
+//! `archaeologus-api` — Axum HTTP server with `OpenAPI` / Swagger UI.
 //!
 //! # Quick start
 //! ```no_run
-//! use archaeologist_api::serve;
+//! use archaeologus_api::serve;
 //! use sqlx::PgPool;
 //!
 //! # async fn example(pool: PgPool) -> anyhow::Result<()> {

@@ -17,7 +17,7 @@ impl AppConfig {
     pub fn from_env() -> anyhow::Result<Self> {
         Ok(Self {
             database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {
-                "postgres://archaeologist:archaeologist_dev@localhost:5432/archaeologist".into()
+                "postgres://archaeologus:archaeologus_dev@localhost:5432/archaeologus".into()
             }),
             rust_log: env::var("RUST_LOG").unwrap_or_else(|_| "info,sqlx=warn".into()),
             llm_provider: env::var("LLM_PROVIDER").unwrap_or_else(|_| "watsonx".into()),

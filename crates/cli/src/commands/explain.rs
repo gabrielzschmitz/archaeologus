@@ -2,7 +2,7 @@
 //! or file.
 
 use anyhow::{Context, Result};
-use archaeologist_db::{
+use archaeologus_db::{
     create_pool,
     repositories::{
         get_commit, get_evidence_for_symbol, get_file_by_path, list_repositories,
@@ -10,8 +10,8 @@ use archaeologist_db::{
     },
     run_migrations,
 };
-use archaeologist_evidence::{aggregate_evidence, explain_symbol};
-use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
+use archaeologus_evidence::{aggregate_evidence, explain_symbol};
+use archaeologus_search::symbol_search::{search_symbols, SymbolQuery};
 use tracing::info;
 
 /// Options for the `explain` sub-command.
@@ -57,7 +57,7 @@ pub async fn run(opts: ExplainOptions) -> Result<()> {
 
 // ── File explanation ──────────────────────────────────────────────────────────
 
-async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<()> {
+async fn explain_file(pool: &archaeologus_db::PgPool, target: &str) -> Result<()> {
     // Look up the file across all known repositories.
     let repos = list_repositories(pool).await.context("list repositories")?;
 
@@ -74,7 +74,7 @@ async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<(
             println!("Size      : {} bytes", file.size_bytes);
 
             // List symbols in this file.
-            let syms: Vec<archaeologist_core::models::Symbol> = sqlx::query_as(
+            let syms: Vec<archaeologus_core::models::Symbol> = sqlx::query_as(
                 "SELECT id, file_id, repository_id, name, symbol_type, language,
                             line_start, line_end, col_start, col_end,
                             visibility, doc_comment, raw_text, created_at
@@ -105,7 +105,7 @@ async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<(
 
     if !found {
         println!("No indexed file matching {target:?}.");
-        println!("Tip: index a repository first with `archaeologist index <path>`.");
+        println!("Tip: index a repository first with `archaeologus index <path>`.");
     }
 
     Ok(())
@@ -114,7 +114,7 @@ async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<(
 // ── Symbol explanation ────────────────────────────────────────────────────────
 
 async fn explain_symbol_cmd(
-    pool: &archaeologist_db::PgPool,
+    pool: &archaeologus_db::PgPool,
     target: &str,
     language: Option<&str>,
 ) -> Result<()> {
@@ -126,7 +126,7 @@ async fn explain_symbol_cmd(
 
     if result.items.is_empty() {
         println!("No symbol matching {target:?} found.");
-        println!("Tip: index a repository first with `archaeologist index <path>`.");
+        println!("Tip: index a repository first with `archaeologus index <path>`.");
         return Ok(());
     }
 

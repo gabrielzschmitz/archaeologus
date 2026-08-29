@@ -1,8 +1,8 @@
-//! `archaeologist-search` — symbol and code search using `PostgreSQL` `pg_trgm`.
+//! `archaeologus-search` — symbol and code search using `PostgreSQL` `pg_trgm`.
 //!
 //! # Quick start
 //! ```no_run
-//! use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
+//! use archaeologus_search::symbol_search::{search_symbols, SymbolQuery};
 //!
 //! # async fn example(pool: sqlx::PgPool) -> Result<(), sqlx::Error> {
 //! let result = search_symbols(

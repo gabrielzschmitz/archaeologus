@@ -9,15 +9,15 @@ license = "MIT"
 
 [workspace.dependencies]
 # Internal crates
-archaeologist-core = { path = "crates/core" }
-archaeologist-db = { path = "crates/db" }
-archaeologist-git = { path = "crates/git" }
-archaeologist-indexer = { path = "crates/indexer" }
-archaeologist-search = { path = "crates/search" }
-archaeologist-evidence = { path = "crates/evidence" }
-archaeologist-api = { path = "crates/api" }
-archaeologist-mcp = { path = "crates/mcp" }
-archaeologist-llm = { path = "crates/llm" }
+archaeologus-core = { path = "crates/core" }
+archaeologus-db = { path = "crates/db" }
+archaeologus-git = { path = "crates/git" }
+archaeologus-indexer = { path = "crates/indexer" }
+archaeologus-search = { path = "crates/search" }
+archaeologus-evidence = { path = "crates/evidence" }
+archaeologus-api = { path = "crates/api" }
+archaeologus-mcp = { path = "crates/mcp" }
+archaeologus-llm = { path = "crates/llm" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

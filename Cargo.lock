@@ -98,14 +98,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-api"
+name = "archaeologus-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
- "archaeologist-db",
- "archaeologist-evidence",
- "archaeologist-search",
+ "archaeologus-core",
+ "archaeologus-db",
+ "archaeologus-evidence",
+ "archaeologus-search",
  "axum",
  "chrono",
  "http-body-util",
@@ -123,19 +123,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-cli"
+name = "archaeologus-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-api",
- "archaeologist-core",
- "archaeologist-db",
- "archaeologist-evidence",
- "archaeologist-git",
- "archaeologist-indexer",
- "archaeologist-llm",
- "archaeologist-mcp",
- "archaeologist-search",
+ "archaeologus-api",
+ "archaeologus-core",
+ "archaeologus-db",
+ "archaeologus-evidence",
+ "archaeologus-git",
+ "archaeologus-indexer",
+ "archaeologus-llm",
+ "archaeologus-mcp",
+ "archaeologus-search",
  "axum",
  "chrono",
  "clap",
@@ -154,7 +154,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-core"
+name = "archaeologus-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -169,11 +169,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-db"
+name = "archaeologus-db"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
+ "archaeologus-core",
  "chrono",
  "serde_json",
  "sqlx",
@@ -183,13 +183,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-evidence"
+name = "archaeologus-evidence"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
- "archaeologist-db",
- "archaeologist-git",
+ "archaeologus-core",
+ "archaeologus-db",
+ "archaeologus-git",
  "chrono",
  "sqlx",
  "tokio",
@@ -198,11 +198,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-git"
+name = "archaeologus-git"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
+ "archaeologus-core",
  "chrono",
  "criterion",
  "git2",
@@ -215,11 +215,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-indexer"
+name = "archaeologus-indexer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
+ "archaeologus-core",
  "criterion",
  "rayon",
  "serde",
@@ -240,12 +240,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-llm"
+name = "archaeologus-llm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
- "archaeologist-evidence",
+ "archaeologus-core",
+ "archaeologus-evidence",
  "async-trait",
  "chrono",
  "reqwest",
@@ -258,16 +258,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-mcp"
+name = "archaeologus-mcp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
- "archaeologist-db",
- "archaeologist-evidence",
- "archaeologist-git",
- "archaeologist-indexer",
- "archaeologist-search",
+ "archaeologus-core",
+ "archaeologus-db",
+ "archaeologus-evidence",
+ "archaeologus-git",
+ "archaeologus-indexer",
+ "archaeologus-search",
  "axum",
  "hex",
  "rmcp",
@@ -282,12 +282,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "archaeologist-search"
+name = "archaeologus-search"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "archaeologist-core",
- "archaeologist-db",
+ "archaeologus-core",
+ "archaeologus-db",
  "sqlx",
  "tokio",
  "tracing",
@@ -1539,9 +1539,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.14.0"
+version = "2.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
+checksum = "07aa2048142242915a31d35844fb311e0e53fcca590c3a0a40dcf1b841fa09eb"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
@@ -1697,9 +1697,9 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libredox"
-version = "0.1.20"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d0a00925a9f930d679b6789b721e3a7f9ed110f41b86d2497caa780c3a070a"
+checksum = "d7955dfc218a8afb29dfeffd540e3a6e96baeb94fe7138228dd7cc6937fbbf96"
 dependencies = [
  "bitflags 2.13.1",
  "libc",
@@ -3636,9 +3636,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.25.0"
+version = "1.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f053576934f05a761a402421fbbe3d425d9366f75f978806a037b3ca481abecc"
+checksum = "b5772d71c9be8a8a6ac2117d949c5b224c1b72241bb611d9a3012edcf8af7812"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",

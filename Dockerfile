@@ -11,7 +11,7 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
-RUN cargo build --release --bin archaeologist
+RUN cargo build --release --bin archaeologus
 
 FROM debian:bookworm-slim
 
@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /app/target/release/archaeologist .
+COPY --from=builder /app/target/release/archaeologus .
 COPY migrations ./migrations
 
 EXPOSE 8080
-CMD ["./archaeologist", "serve"]
+CMD ["./archaeologus", "serve"]

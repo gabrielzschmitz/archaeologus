@@ -11,7 +11,7 @@
 //! Both modes share the same optional filters and pagination parameters
 //! through [`SymbolQuery`].
 
-use archaeologist_core::models::Symbol;
+use archaeologus_core::models::Symbol;
 use sqlx::PgPool;
 use tracing::debug;
 use uuid::Uuid;

@@ -1,27 +1,27 @@
 [package]
-name = "archaeologist-cli"
+name = "archaeologus-cli"
 version.workspace = true
 edition.workspace = true
-default-run = "archaeologist"
+default-run = "archaeologus"
 
 [lib]
-name = "archaeologist_cli"
+name = "archaeologus_cli"
 path = "src/lib.rs"
 
 [[bin]]
-name = "archaeologist"
+name = "archaeologus"
 path = "src/main.rs"
 
 [dependencies]
-archaeologist-core = { workspace = true }
-archaeologist-db = { workspace = true }
-archaeologist-git = { workspace = true }
-archaeologist-indexer = { workspace = true }
-archaeologist-evidence = { workspace = true }
-archaeologist-search = { workspace = true }
-archaeologist-api = { workspace = true }
-archaeologist-mcp = { workspace = true }
-archaeologist-llm = { workspace = true }
+archaeologus-core = { workspace = true }
+archaeologus-db = { workspace = true }
+archaeologus-git = { workspace = true }
+archaeologus-indexer = { workspace = true }
+archaeologus-evidence = { workspace = true }
+archaeologus-search = { workspace = true }
+archaeologus-api = { workspace = true }
+archaeologus-mcp = { workspace = true }
+archaeologus-llm = { workspace = true }
 rmcp = { workspace = true }
 axum = { workspace = true }
 clap = { workspace = true }

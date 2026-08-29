@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use archaeologist_core::models::{
+use archaeologus_core::models::{
     SymbolCommit, SymbolCommitCreate, SymbolDependency, SymbolDependencyCreate,
 };
 use sqlx::PgPool;

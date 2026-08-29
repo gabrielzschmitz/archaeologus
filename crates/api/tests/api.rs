@@ -1,4 +1,4 @@
-//! Integration tests for `archaeologist-api`.
+//! Integration tests for `archaeologus-api`.
 //!
 //! Uses `tower::ServiceExt` + `http-body-util` for in-process HTTP testing —
 //! no separate test server process is needed.
@@ -8,10 +8,10 @@
 //!
 //! Run with:
 //! ```text
-//! DATABASE_URL=postgres://... cargo test -p archaeologist-api
+//! DATABASE_URL=postgres://... cargo test -p archaeologus-api
 //! ```
 
-use archaeologist_api::{build_router, state::AppState};
+use archaeologus_api::{build_router, state::AppState};
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -31,7 +31,7 @@ fn build_app(pool: PgPool) -> axum::Router {
 async fn try_pool() -> Option<PgPool> {
     let url = std::env::var("DATABASE_URL").ok()?;
     let pool = PgPool::connect(&url).await.ok()?;
-    archaeologist_db::run_migrations(&pool).await.ok()?;
+    archaeologus_db::run_migrations(&pool).await.ok()?;
     Some(pool)
 }
 
@@ -93,9 +93,9 @@ async fn health_returns_ok() {
 
 #[test]
 fn openapi_document_generates_without_panic() {
-    let doc = archaeologist_api::openapi::ApiDoc::openapi();
+    let doc = archaeologus_api::openapi::ApiDoc::openapi();
     let json = serde_json::to_string(&doc).expect("spec must serialize");
-    assert!(json.contains("AI Software Archaeologist API"));
+    assert!(json.contains("AI Software Archaeologus API"));
 }
 
 #[tokio::test]
@@ -106,7 +106,7 @@ async fn openapi_spec_is_served() {
 
     let (status, spec) = get(&app, "/api-docs/openapi.json").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(spec["info"]["title"], "AI Software Archaeologist API");
+    assert_eq!(spec["info"]["title"], "AI Software Archaeologus API");
     assert!(spec["paths"].is_object());
 }
 

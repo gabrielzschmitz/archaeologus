@@ -1,7 +1,7 @@
 //! Evidence aggregator — collects and deduplicates evidence for a symbol from
 //! multiple sources (commits, code, blame) and returns a ranked list.
 
-use archaeologist_core::models::{Commit, Evidence, Symbol};
+use archaeologus_core::models::{Commit, Evidence, Symbol};
 use tracing::{debug, info};
 use uuid::Uuid;
 

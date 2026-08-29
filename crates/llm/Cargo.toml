@@ -1,11 +1,11 @@
 [package]
-name = "archaeologist-llm"
+name = "archaeologus-llm"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-archaeologist-core = { workspace = true }
-archaeologist-evidence = { workspace = true }
+archaeologus-core = { workspace = true }
+archaeologus-evidence = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

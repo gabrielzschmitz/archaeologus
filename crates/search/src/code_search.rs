@@ -8,7 +8,7 @@
 //!   `pg_trgm` similarity + ILIKE, returning the matching symbols so the
 //!   caller can locate the exact source lines.
 
-use archaeologist_core::models::{File, Symbol};
+use archaeologus_core::models::{File, Symbol};
 use sqlx::PgPool;
 use tracing::debug;
 use uuid::Uuid;
