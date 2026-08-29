@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Repository {
     pub id: Uuid,
     pub name: String,
@@ -16,6 +17,7 @@ pub struct Repository {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RepositoryCreate {
     pub name: String,
     pub url: String,

@@ -19,6 +19,7 @@ archaeologist-git = { workspace = true }
 archaeologist-indexer = { workspace = true }
 archaeologist-evidence = { workspace = true }
 archaeologist-search = { workspace = true }
+archaeologist-api = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

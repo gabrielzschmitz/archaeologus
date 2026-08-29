@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SymbolCommit {
     pub id: Uuid,
     pub symbol_id: Uuid,
@@ -10,6 +11,7 @@ pub struct SymbolCommit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SymbolCommitCreate {
     pub symbol_id: Uuid,
     pub commit_id: Uuid,
@@ -18,6 +20,7 @@ pub struct SymbolCommitCreate {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SymbolDependency {
     pub id: Uuid,
     pub symbol_id: Uuid,
@@ -27,6 +30,7 @@ pub struct SymbolDependency {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SymbolDependencyCreate {
     pub symbol_id: Uuid,
     pub depends_on_symbol_id: Option<Uuid>,

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SymbolType {
     Function,
@@ -75,6 +76,7 @@ impl std::str::FromStr for SymbolType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Symbol {
     pub id: Uuid,
     pub file_id: Uuid,
@@ -93,6 +95,7 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SymbolCreate {
     pub file_id: Uuid,
     pub repository_id: Uuid,

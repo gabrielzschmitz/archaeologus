@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Commit {
     pub id: Uuid,
     pub repository_id: Uuid,
@@ -19,6 +20,7 @@ pub struct Commit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CommitCreate {
     pub repository_id: Uuid,
     pub sha: String,
@@ -33,6 +35,7 @@ pub struct CommitCreate {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CommitFile {
     pub id: Uuid,
     pub commit_id: Uuid,
@@ -44,6 +47,7 @@ pub struct CommitFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CommitFileCreate {
     pub commit_id: Uuid,
     pub file_path: String,

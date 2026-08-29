@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceType {
     Commit,
@@ -29,6 +30,7 @@ impl std::fmt::Display for EvidenceType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Confidence {
     High,
@@ -49,6 +51,7 @@ impl std::fmt::Display for Confidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Evidence {
     pub id: Uuid,
     pub repository_id: Uuid,
@@ -63,6 +66,7 @@ pub struct Evidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct EvidenceCreate {
     pub repository_id: Uuid,
     pub evidence_type: EvidenceType,

@@ -15,6 +15,7 @@ archaeologist-git = { path = "crates/git" }
 archaeologist-indexer = { path = "crates/indexer" }
 archaeologist-search = { path = "crates/search" }
 archaeologist-evidence = { path = "crates/evidence" }
+archaeologist-api = { path = "crates/api" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -76,6 +77,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 walkdir = "2"
 regex = "1"
+
+# HTTP server
+axum = { version = "0.8", features = ["macros"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# OpenAPI
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

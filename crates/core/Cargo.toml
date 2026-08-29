@@ -12,6 +12,10 @@ anyhow = { workspace = true }
 jiff = { workspace = true }
 sqlx = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
+utoipa = { workspace = true, optional = true }
+
+[features]
+openapi = ["dep:utoipa"]
 
 [lints]
 workspace = true

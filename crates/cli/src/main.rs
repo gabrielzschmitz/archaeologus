@@ -82,6 +82,12 @@ enum Commands {
         #[arg(short, long, default_value = "8080")]
         port: u16,
     },
+    /// Start the HTTP REST API server
+    Serve {
+        /// Address to bind (e.g. 0.0.0.0:3000)
+        #[arg(short, long, default_value = "0.0.0.0:3000")]
+        addr: String,
+    },
     /// Run database migrations
     Migrate,
 }
@@ -168,6 +174,12 @@ async fn main() -> anyhow::Result<()> {
             let pool = archaeologist_db::create_pool(&config.database_url).await?;
             archaeologist_db::run_migrations(&pool).await?;
             println!("MCP server started");
+        }
+        Commands::Serve { addr } => {
+            init_tracing(&config.rust_log);
+            let pool = archaeologist_db::create_pool(&config.database_url).await?;
+            archaeologist_db::run_migrations(&pool).await?;
+            archaeologist_api::serve(pool, &addr).await?;
         }
         Commands::Migrate => {
             init_tracing(&config.rust_log);
