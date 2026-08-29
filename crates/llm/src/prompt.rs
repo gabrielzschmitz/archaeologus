@@ -56,17 +56,12 @@ pub fn file_context(file: &File) -> String {
 /// Build a context block from a single [`Symbol`].
 ///
 /// Shows: name, type, language, visibility, doc-comment, full source text
-/// with line-number anchors, and the file:line location.
+/// with line-number anchors, and the `file:line` location.
 #[must_use]
 pub fn symbol_context(symbol: &Symbol, file: Option<&File>) -> String {
     let location = file.map_or_else(
         || format!("lines {}-{}", symbol.line_start, symbol.line_end),
-        |f| {
-            format!(
-                "{}:{}-{}",
-                f.path, symbol.line_start, symbol.line_end
-            )
-        },
+        |f| format!("{}:{}-{}", f.path, symbol.line_start, symbol.line_end),
     );
 
     let mut s = format!(
@@ -114,20 +109,48 @@ pub fn deps_context(deps: &[SymbolDependency]) -> String {
 
 /// Build a context block listing sibling symbols defined in the same file.
 ///
-/// These are the other symbols living alongside the matched symbol, giving
-/// the LLM a "neighbourhood" view of what the file does.
+/// Symbols whose `raw_text` contains the matched symbol's name are shown with
+/// their full source body so the LLM can see usages in context.
 #[must_use]
-pub fn siblings_context(siblings: &[Symbol]) -> String {
+pub fn siblings_context(siblings: &[Symbol], symbol_name: &str) -> String {
     if siblings.is_empty() {
         return String::new();
     }
     let mut s = "  Other symbols in the same file:\n".to_string();
     for sib in siblings.iter().take(15) {
-        let _ = writeln!(
-            s,
-            "    - `{}` ({} {}) lines {}-{}",
-            sib.name, sib.language, sib.symbol_type, sib.line_start, sib.line_end
-        );
+        // Include the full source body when the sibling references the symbol
+        // by name — this surfaces actual usage patterns.
+        let mentions = sib.raw_text.contains(symbol_name);
+        if mentions && !sib.raw_text.is_empty() {
+            let limit = 800;
+            let excerpt: String = sib.raw_text.chars().take(limit).collect();
+            let excerpt = if sib.raw_text.chars().count() > limit {
+                format!("{excerpt}…")
+            } else {
+                excerpt
+            };
+            let _ = writeln!(
+                s,
+                "    - `{}` ({} {}) lines {}-{} [uses `{}`]:\n{}",
+                sib.name,
+                sib.language,
+                sib.symbol_type,
+                sib.line_start,
+                sib.line_end,
+                symbol_name,
+                excerpt
+                    .lines()
+                    .map(|l| format!("      {l}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
+        } else {
+            let _ = writeln!(
+                s,
+                "    - `{}` ({} {}) lines {}-{}",
+                sib.name, sib.language, sib.symbol_type, sib.line_start, sib.line_end
+            );
+        }
     }
     s
 }
@@ -231,8 +254,8 @@ pub fn build_ask_prompt(question: &str, contexts: &[SymbolContext<'_>]) -> ChatM
                 body.push_str(&dep_block);
             }
 
-            // Sibling symbols in the same file
-            let sib_block = siblings_context(ctx.siblings);
+            // Sibling symbols in the same file (with source bodies for those that use this symbol)
+            let sib_block = siblings_context(ctx.siblings, ctx.symbol.name.as_str());
             if !sib_block.is_empty() {
                 body.push_str(&sib_block);
             }
@@ -339,7 +362,11 @@ mod tests {
 
     #[test]
     fn symbol_context_includes_name_language_and_location() {
-        let sym = make_symbol("authenticate", Some("Validates credentials."), "fn authenticate() {}");
+        let sym = make_symbol(
+            "authenticate",
+            Some("Validates credentials."),
+            "fn authenticate() {}",
+        );
         let file = make_file("src/auth.rs");
         let ctx = symbol_context(&sym, Some(&file));
         assert!(ctx.contains("authenticate"));
@@ -386,10 +413,7 @@ mod tests {
 
     #[test]
     fn deps_context_lists_dependencies() {
-        let deps = vec![
-            make_dep("fmt", "import"),
-            make_dep("io.Writer", "call"),
-        ];
+        let deps = vec![make_dep("fmt", "import"), make_dep("io.Writer", "call")];
         let ctx = deps_context(&deps);
         assert!(ctx.contains("fmt"));
         assert!(ctx.contains("io.Writer"));
@@ -399,7 +423,7 @@ mod tests {
 
     #[test]
     fn siblings_context_empty_returns_empty_string() {
-        assert_eq!(siblings_context(&[]), "");
+        assert_eq!(siblings_context(&[], "User"), "");
     }
 
     #[test]
@@ -408,9 +432,18 @@ mod tests {
             make_symbol("NewUser", None, "func NewUser() {}"),
             make_symbol("DeleteUser", None, "func DeleteUser() {}"),
         ];
-        let ctx = siblings_context(&siblings);
+        let ctx = siblings_context(&siblings, "User");
         assert!(ctx.contains("NewUser"));
         assert!(ctx.contains("DeleteUser"));
+    }
+
+    #[test]
+    fn siblings_context_shows_body_for_referencing_symbol() {
+        let user = make_symbol("main", None, "func main() { u := User{Name: \"Alice\"} }");
+        let ctx = siblings_context(&[user], "User");
+        // main references User, so its body should be shown
+        assert!(ctx.contains("uses `User`"));
+        assert!(ctx.contains("func main()"));
     }
 
     #[test]

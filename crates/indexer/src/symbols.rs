@@ -51,6 +51,8 @@ pub struct ExtractedSymbol {
     pub kind: SymbolKind,
     pub visibility: Option<String>,
     pub doc_comment: Option<String>,
+    /// Full source text of the symbol node (capped at 4 KiB to stay DB-friendly).
+    pub raw_text: String,
     pub line_start: usize,
     pub line_end: usize,
     pub col_start: usize,
@@ -86,20 +88,38 @@ fn child_text<'a>(node: Node<'_>, kind: &str, source: &'a [u8]) -> Option<&'a st
     None
 }
 
+/// Maximum bytes we store for `raw_text` per symbol (4 KiB).
+const RAW_TEXT_CAP: usize = 4096;
+
 fn make_sym(
     name: String,
     kind: SymbolKind,
     node: Node<'_>,
+    source: &[u8],
     visibility: Option<String>,
     doc_comment: Option<String>,
 ) -> ExtractedSymbol {
     let start = node.start_position();
     let end = node.end_position();
+
+    // Slice the raw bytes for this node and cap at RAW_TEXT_CAP.
+    let node_bytes = &source[node.start_byte()..node.end_byte().min(source.len())];
+    let raw_text = if node_bytes.len() > RAW_TEXT_CAP {
+        let truncated = &node_bytes[..RAW_TEXT_CAP];
+        // Back up to the last valid UTF-8 boundary.
+        let valid = std::str::from_utf8(truncated)
+            .unwrap_or_else(|e| std::str::from_utf8(&truncated[..e.valid_up_to()]).unwrap_or(""));
+        format!("{valid}…")
+    } else {
+        String::from_utf8_lossy(node_bytes).into_owned()
+    };
+
     ExtractedSymbol {
         name,
         kind,
         visibility,
         doc_comment,
+        raw_text,
         line_start: start.row,
         line_end: end.row,
         col_start: start.column,
@@ -173,7 +193,7 @@ fn extract_rust(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
 
         let vis = child_text(node, "visibility_modifier", source).map(String::from);
         let doc = preceding_doc_comment(node, source);
-        out.push(make_sym(name, kind, node, vis, doc));
+        out.push(make_sym(name, kind, node, source, vis, doc));
     });
     out
 }
@@ -186,7 +206,6 @@ fn extract_python(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             "class_definition" => SymbolKind::Class,
             _ => return,
         };
-        // Check if it's a method (parent is a block inside a class_definition).
         let adjusted_kind = if kind == SymbolKind::Function {
             if node
                 .parent()
@@ -208,7 +227,7 @@ fn extract_python(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             return;
         }
         let doc = preceding_doc_comment(node, source);
-        out.push(make_sym(name, adjusted_kind, node, None, doc));
+        out.push(make_sym(name, adjusted_kind, node, source, None, doc));
     });
     out
 }
@@ -224,7 +243,14 @@ fn extract_javascript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Function, node, None, doc));
+            out.push(make_sym(
+                name,
+                SymbolKind::Function,
+                node,
+                source,
+                None,
+                doc,
+            ));
         }
         "class_declaration" | "class" => {
             let name = child_text(node, "identifier", source)
@@ -234,7 +260,7 @@ fn extract_javascript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Class, node, None, doc));
+            out.push(make_sym(name, SymbolKind::Class, node, source, None, doc));
         }
         "method_definition" => {
             let name = child_text(node, "property_identifier", source)
@@ -248,7 +274,7 @@ fn extract_javascript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             } else {
                 SymbolKind::Method
             };
-            out.push(make_sym(name, kind, node, None, None));
+            out.push(make_sym(name, kind, node, source, None, None));
         }
         _ => {}
     });
@@ -266,7 +292,14 @@ fn extract_typescript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Function, node, None, doc));
+            out.push(make_sym(
+                name,
+                SymbolKind::Function,
+                node,
+                source,
+                None,
+                doc,
+            ));
         }
         "class_declaration" | "class" => {
             let name = child_text(node, "type_identifier", source)
@@ -277,7 +310,7 @@ fn extract_typescript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Class, node, None, doc));
+            out.push(make_sym(name, SymbolKind::Class, node, source, None, doc));
         }
         "method_definition" => {
             let name = child_text(node, "property_identifier", source)
@@ -291,7 +324,7 @@ fn extract_typescript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             } else {
                 SymbolKind::Method
             };
-            out.push(make_sym(name, kind, node, None, None));
+            out.push(make_sym(name, kind, node, source, None, None));
         }
         "interface_declaration" => {
             let name = child_text(node, "type_identifier", source)
@@ -301,7 +334,14 @@ fn extract_typescript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Interface, node, None, doc));
+            out.push(make_sym(
+                name,
+                SymbolKind::Interface,
+                node,
+                source,
+                None,
+                doc,
+            ));
         }
         "type_alias_declaration" => {
             let name = child_text(node, "type_identifier", source)
@@ -311,7 +351,7 @@ fn extract_typescript(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Type, node, None, doc));
+            out.push(make_sym(name, SymbolKind::Type, node, source, None, doc));
         }
         _ => {}
     });
@@ -329,7 +369,14 @@ fn extract_go(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Function, node, None, doc));
+            out.push(make_sym(
+                name,
+                SymbolKind::Function,
+                node,
+                source,
+                None,
+                doc,
+            ));
         }
         "method_declaration" => {
             let name = child_text(node, "field_identifier", source)
@@ -339,7 +386,7 @@ fn extract_go(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Method, node, None, doc));
+            out.push(make_sym(name, SymbolKind::Method, node, source, None, doc));
         }
         "type_declaration" => {
             let mut cursor = node.walk();
@@ -365,7 +412,8 @@ fn extract_go(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                         SymbolKind::Type
                     };
                     let doc = preceding_doc_comment(node, source);
-                    out.push(make_sym(name, kind, child, None, doc));
+                    // Use `node` (type_declaration) for full source span.
+                    out.push(make_sym(name, kind, node, source, None, doc));
                 }
             }
         }
@@ -386,7 +434,7 @@ fn extract_java(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             }
             let vis = modifiers_visibility(node, source);
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Class, node, vis, doc));
+            out.push(make_sym(name, SymbolKind::Class, node, source, vis, doc));
         }
         "interface_declaration" => {
             let name = child_text(node, "identifier", source)
@@ -397,7 +445,14 @@ fn extract_java(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             }
             let vis = modifiers_visibility(node, source);
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Interface, node, vis, doc));
+            out.push(make_sym(
+                name,
+                SymbolKind::Interface,
+                node,
+                source,
+                vis,
+                doc,
+            ));
         }
         "method_declaration" => {
             let name = child_text(node, "identifier", source)
@@ -407,7 +462,7 @@ fn extract_java(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let vis = modifiers_visibility(node, source);
-            out.push(make_sym(name, SymbolKind::Method, node, vis, None));
+            out.push(make_sym(name, SymbolKind::Method, node, source, vis, None));
         }
         "constructor_declaration" => {
             let name = child_text(node, "identifier", source)
@@ -417,7 +472,14 @@ fn extract_java(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let vis = modifiers_visibility(node, source);
-            out.push(make_sym(name, SymbolKind::Constructor, node, vis, None));
+            out.push(make_sym(
+                name,
+                SymbolKind::Constructor,
+                node,
+                source,
+                vis,
+                None,
+            ));
         }
         "enum_declaration" => {
             let name = child_text(node, "identifier", source)
@@ -428,7 +490,7 @@ fn extract_java(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
             }
             let vis = modifiers_visibility(node, source);
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Enum, node, vis, doc));
+            out.push(make_sym(name, SymbolKind::Enum, node, source, vis, doc));
         }
         _ => {}
     });
@@ -453,52 +515,54 @@ fn modifiers_visibility(node: Node<'_>, source: &[u8]) -> Option<String> {
 fn extract_c(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
     let mut out = Vec::new();
 
-    walk_named(root, &mut |node| {
-        match node.kind() {
-            "function_definition" => {
-                if let Some(name) = c_function_name(node, source) {
-                    out.push(make_sym(name, SymbolKind::Function, node, None, None));
-                }
+    walk_named(root, &mut |node| match node.kind() {
+        "function_definition" => {
+            if let Some(name) = c_function_name(node, source) {
+                out.push(make_sym(
+                    name,
+                    SymbolKind::Function,
+                    node,
+                    source,
+                    None,
+                    None,
+                ));
             }
-
-            "type_definition" => {
-                // typedef struct { … } Name;
-                let name = c_typedef_name(node, source);
-
-                if let Some(n) = name {
-                    let kind = if node
-                        .children(&mut node.walk())
-                        .any(|c| c.kind() == "struct_specifier")
-                    {
-                        SymbolKind::Struct
-                    } else if node
-                        .children(&mut node.walk())
-                        .any(|c| c.kind() == "enum_specifier")
-                    {
-                        SymbolKind::Enum
-                    } else {
-                        SymbolKind::Type
-                    };
-
-                    out.push(make_sym(n, kind, node, None, None));
-                }
-            }
-
-            "struct_specifier" if node.parent().is_none_or(|p| p.kind() != "type_definition") => {
-                // Named struct (not inside a typedef).
-                if let Some(name) = child_text(node, "type_identifier", source) {
-                    out.push(make_sym(
-                        name.to_string(),
-                        SymbolKind::Struct,
-                        node,
-                        None,
-                        None,
-                    ));
-                }
-            }
-
-            _ => {}
         }
+
+        "type_definition" => {
+            let name = c_typedef_name(node, source);
+            if let Some(n) = name {
+                let kind = if node
+                    .children(&mut node.walk())
+                    .any(|c| c.kind() == "struct_specifier")
+                {
+                    SymbolKind::Struct
+                } else if node
+                    .children(&mut node.walk())
+                    .any(|c| c.kind() == "enum_specifier")
+                {
+                    SymbolKind::Enum
+                } else {
+                    SymbolKind::Type
+                };
+                out.push(make_sym(n, kind, node, source, None, None));
+            }
+        }
+
+        "struct_specifier" if node.parent().is_none_or(|p| p.kind() != "type_definition") => {
+            if let Some(name) = child_text(node, "type_identifier", source) {
+                out.push(make_sym(
+                    name.to_string(),
+                    SymbolKind::Struct,
+                    node,
+                    source,
+                    None,
+                    None,
+                ));
+            }
+        }
+
+        _ => {}
     });
 
     out
@@ -536,7 +600,14 @@ fn extract_cpp(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
     walk_named(root, &mut |node| match node.kind() {
         "function_definition" => {
             if let Some(name) = cpp_function_name(node, source) {
-                out.push(make_sym(name, SymbolKind::Function, node, None, None));
+                out.push(make_sym(
+                    name,
+                    SymbolKind::Function,
+                    node,
+                    source,
+                    None,
+                    None,
+                ));
             }
         }
         "class_specifier" => {
@@ -547,7 +618,7 @@ fn extract_cpp(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Class, node, None, doc));
+            out.push(make_sym(name, SymbolKind::Class, node, source, None, doc));
         }
         "struct_specifier" => {
             if node.parent().is_some_and(|p| p.kind() == "class_specifier") {
@@ -560,7 +631,7 @@ fn extract_cpp(root: Node<'_>, source: &[u8]) -> Vec<ExtractedSymbol> {
                 return;
             }
             let doc = preceding_doc_comment(node, source);
-            out.push(make_sym(name, SymbolKind::Struct, node, None, doc));
+            out.push(make_sym(name, SymbolKind::Struct, node, source, None, doc));
         }
         _ => {}
     });

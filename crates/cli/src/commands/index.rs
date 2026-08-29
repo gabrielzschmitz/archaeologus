@@ -14,9 +14,9 @@ use archaeologist_db::PgPool;
 use archaeologist_db::{
     create_pool,
     repositories::{
-        create_commit, create_commit_file, create_file, create_repository, create_symbol,
+        create_commit, create_commit_file, create_file, create_repository,
         create_symbol_dependency, get_commit_by_sha, get_file_by_path, get_repository_by_url,
-        update_repository_indexed, upsert_branch, upsert_symbol_commit, upsert_tag,
+        update_repository_indexed, upsert_branch, upsert_symbol, upsert_symbol_commit, upsert_tag,
     },
     run_migrations,
 };
@@ -167,34 +167,57 @@ async fn store_files(
             .to_string_lossy()
             .into_owned();
 
-        // Idempotency: reuse the existing file id if the content is unchanged.
-        if let Ok(Some(existing)) = get_file_by_path(pool, repo_id, &rel_path).await {
+        // Idempotency: reuse the existing file id if content is unchanged,
+        // but still upsert symbols so raw_text is always up-to-date.
+        let file_id = if let Ok(Some(existing)) = get_file_by_path(pool, repo_id, &rel_path).await {
             if existing.content_hash == content_hash {
-                file_id_map.insert(rel_path, existing.id);
-                continue;
+                file_id_map.insert(rel_path.clone(), existing.id);
+                existing.id
+            } else {
+                let file_create = FileCreate {
+                    repository_id: repo_id,
+                    path: rel_path.clone(),
+                    language: Some(lang_str(indexed_file.language).to_string()),
+                    size_bytes,
+                    content_hash,
+                };
+                match create_file(pool, &file_create).await {
+                    Ok(r) => {
+                        files_stored += 1;
+                        file_id_map.insert(rel_path.clone(), r.id);
+                        r.id
+                    }
+                    Err(e) => {
+                        warn!("DB error storing file {:?}: {e}", indexed_file.path);
+                        continue;
+                    }
+                }
             }
-        }
-
-        let file_create = FileCreate {
-            repository_id: repo_id,
-            path: rel_path.clone(),
-            language: Some(lang_str(indexed_file.language).to_string()),
-            size_bytes,
-            content_hash,
-        };
-        let file_record = match create_file(pool, &file_create).await {
-            Ok(r) => r,
-            Err(e) => {
-                warn!("DB error storing file {:?}: {e}", indexed_file.path);
-                continue;
+        } else {
+            let file_create = FileCreate {
+                repository_id: repo_id,
+                path: rel_path.clone(),
+                language: Some(lang_str(indexed_file.language).to_string()),
+                size_bytes,
+                content_hash,
+            };
+            match create_file(pool, &file_create).await {
+                Ok(r) => {
+                    files_stored += 1;
+                    file_id_map.insert(rel_path.clone(), r.id);
+                    r.id
+                }
+                Err(e) => {
+                    warn!("DB error storing file {:?}: {e}", indexed_file.path);
+                    continue;
+                }
             }
         };
-        files_stored += 1;
-        file_id_map.insert(rel_path, file_record.id);
 
+        // Always upsert symbols so raw_text stays fresh even on re-index.
         for sym in &indexed_file.symbols {
             let sym_create = SymbolCreate {
-                file_id: file_record.id,
+                file_id,
                 repository_id: repo_id,
                 name: sym.name.clone(),
                 symbol_type: indexer_kind_to_core(&sym.kind),
@@ -205,9 +228,9 @@ async fn store_files(
                 col_end: i32::try_from(sym.col_end).unwrap_or(0),
                 visibility: sym.visibility.clone(),
                 doc_comment: sym.doc_comment.clone(),
-                raw_text: sym.name.clone(),
+                raw_text: sym.raw_text.clone(),
             };
-            match create_symbol(pool, &sym_create).await {
+            match upsert_symbol(pool, &sym_create).await {
                 Ok(s) => {
                     symbols_stored += 1;
                     symbol_id_map
@@ -215,7 +238,7 @@ async fn store_files(
                         .or_default()
                         .push(s.id);
                 }
-                Err(e) => warn!("DB error storing symbol '{}': {e}", sym.name),
+                Err(e) => warn!("DB error upserting symbol '{}': {e}", sym.name),
             }
         }
     }

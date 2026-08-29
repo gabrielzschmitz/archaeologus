@@ -29,6 +29,46 @@ pub async fn create_symbol(pool: &PgPool, symbol: &SymbolCreate) -> Result<Symbo
     Ok(record)
 }
 
+/// Upsert a symbol: insert or update `raw_text`, `doc_comment`, and line
+/// positions if a symbol with the same `(file_id, name, symbol_type)` already
+/// exists.  Returns the persisted symbol in both cases.
+pub async fn upsert_symbol(pool: &PgPool, symbol: &SymbolCreate) -> Result<Symbol, sqlx::Error> {
+    let record = sqlx::query_as::<_, Symbol>(
+        r"
+        INSERT INTO symbols (file_id, repository_id, name, symbol_type, language,
+                             line_start, line_end, col_start, col_end,
+                             visibility, doc_comment, raw_text)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (file_id, name, symbol_type)
+        DO UPDATE SET
+            raw_text    = EXCLUDED.raw_text,
+            doc_comment = EXCLUDED.doc_comment,
+            line_start  = EXCLUDED.line_start,
+            line_end    = EXCLUDED.line_end,
+            col_start   = EXCLUDED.col_start,
+            col_end     = EXCLUDED.col_end
+        RETURNING id, file_id, repository_id, name, symbol_type, language,
+                  line_start, line_end, col_start, col_end,
+                  visibility, doc_comment, raw_text, created_at
+        ",
+    )
+    .bind(symbol.file_id)
+    .bind(symbol.repository_id)
+    .bind(&symbol.name)
+    .bind(symbol.symbol_type.to_string())
+    .bind(&symbol.language)
+    .bind(symbol.line_start)
+    .bind(symbol.line_end)
+    .bind(symbol.col_start)
+    .bind(symbol.col_end)
+    .bind(&symbol.visibility)
+    .bind(&symbol.doc_comment)
+    .bind(&symbol.raw_text)
+    .fetch_one(pool)
+    .await?;
+    Ok(record)
+}
+
 pub async fn get_symbol(pool: &PgPool, id: Uuid) -> Result<Option<Symbol>, sqlx::Error> {
     let record = sqlx::query_as::<_, Symbol>(
         r"

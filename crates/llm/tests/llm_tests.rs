@@ -12,6 +12,15 @@ use archaeologist_llm::{
     system_prompt,
 };
 use std::str::FromStr;
+use std::sync::{Mutex, MutexGuard};
+
+/// Serialises tests that read/write process-wide environment variables.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+/// Acquire the lock guarding environment-variable access in tests.
+fn env_lock() -> MutexGuard<'static, ()> {
+    ENV_LOCK.lock().unwrap()
+}
 
 // ── Provider type parsing ─────────────────────────────────────────────────────
 
@@ -88,6 +97,7 @@ fn provider_type_display() {
 
 #[test]
 fn llm_config_defaults_to_watsonx() {
+    let _guard = env_lock();
     // Ensure the env var is not set so we get the default.
     std::env::remove_var("LLM_PROVIDER");
     let cfg = LLMConfig::from_env().unwrap();
@@ -96,6 +106,7 @@ fn llm_config_defaults_to_watsonx() {
 
 #[test]
 fn llm_config_reads_provider_from_env() {
+    let _guard = env_lock();
     std::env::set_var("LLM_PROVIDER", "mock");
     let cfg = LLMConfig::from_env().unwrap();
     assert_eq!(cfg.provider_type, ProviderType::Mock);
@@ -104,6 +115,7 @@ fn llm_config_reads_provider_from_env() {
 
 #[test]
 fn llm_config_reads_temperature_from_env() {
+    let _guard = env_lock();
     std::env::set_var("LLM_TEMPERATURE", "0.3");
     std::env::set_var("LLM_PROVIDER", "mock");
     let cfg = LLMConfig::from_env().unwrap();
@@ -114,6 +126,7 @@ fn llm_config_reads_temperature_from_env() {
 
 #[test]
 fn llm_config_reads_max_tokens_from_env() {
+    let _guard = env_lock();
     std::env::set_var("LLM_MAX_TOKENS", "1024");
     std::env::set_var("LLM_PROVIDER", "mock");
     let cfg = LLMConfig::from_env().unwrap();
@@ -124,6 +137,7 @@ fn llm_config_reads_max_tokens_from_env() {
 
 #[test]
 fn llm_config_invalid_provider_returns_error() {
+    let _guard = env_lock();
     std::env::set_var("LLM_PROVIDER", "nonexistent_provider");
     let result = LLMConfig::from_env();
     std::env::remove_var("LLM_PROVIDER");
@@ -134,6 +148,7 @@ fn llm_config_invalid_provider_returns_error() {
 
 #[test]
 fn create_provider_returns_mock_for_mock_type() {
+    let _guard = env_lock();
     std::env::set_var("LLM_PROVIDER", "mock");
     let cfg = LLMConfig::from_env().unwrap();
     let provider = create_provider(&cfg).unwrap();
@@ -144,6 +159,7 @@ fn create_provider_returns_mock_for_mock_type() {
 
 #[test]
 fn create_provider_ollama_always_succeeds() {
+    let _guard = env_lock();
     // Ollama has no required env vars.
     std::env::set_var("LLM_PROVIDER", "ollama");
     let cfg = LLMConfig::from_env().unwrap();
@@ -154,6 +170,7 @@ fn create_provider_ollama_always_succeeds() {
 
 #[test]
 fn create_provider_watsonx_fails_without_api_key() {
+    let _guard = env_lock();
     std::env::set_var("LLM_PROVIDER", "watsonx");
     std::env::remove_var("WATSONX_API_KEY");
     std::env::remove_var("WATSONX_PROJECT_ID");
@@ -166,6 +183,7 @@ fn create_provider_watsonx_fails_without_api_key() {
 
 #[test]
 fn create_provider_openai_fails_without_api_key() {
+    let _guard = env_lock();
     std::env::set_var("LLM_PROVIDER", "openai");
     std::env::remove_var("OPENAI_API_KEY");
     let cfg = LLMConfig::from_env().unwrap();
@@ -176,10 +194,7 @@ fn create_provider_openai_fails_without_api_key() {
 
 #[test]
 fn create_provider_anthropic_fails_without_api_key() {
-    // This test manipulates env vars; run under a mutex to avoid races.
-    use std::sync::Mutex;
-    static LOCK: Mutex<()> = Mutex::new(());
-    let _guard = LOCK.lock().unwrap();
+    let _guard = env_lock();
 
     std::env::set_var("LLM_PROVIDER", "anthropic");
     let saved = std::env::var("ANTHROPIC_API_KEY").ok();
@@ -268,9 +283,9 @@ fn build_ask_prompt_no_context_mentions_no_symbols() {
 
 #[test]
 fn build_ask_prompt_with_full_context_structure() {
-    use archaeologist_llm::SymbolContext;
+    use archaeologist_core::models::{File, Repository, Symbol};
     use archaeologist_evidence::{aggregate_evidence, explain_symbol};
-    use archaeologist_core::models::{Symbol, File, Repository};
+    use archaeologist_llm::SymbolContext;
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -326,7 +341,9 @@ fn build_ask_prompt_with_full_context_structure() {
     assert!(msg.content.contains("my-api"));
     assert!(msg.content.contains("internal/api/handler.go"));
     assert!(msg.content.contains("42"));
-    assert!(msg.content.contains("HandleRequest processes incoming HTTP requests."));
+    assert!(msg
+        .content
+        .contains("HandleRequest processes incoming HTTP requests."));
 }
 
 // ── ChatMessage helpers ───────────────────────────────────────────────────────
@@ -342,6 +359,7 @@ fn chat_message_constructors_set_roles() {
 
 #[test]
 fn provider_switching_via_env_var() {
+    let _guard = env_lock();
     // Simulate switching between providers.
     for (env_val, expected_type) in [
         ("mock", ProviderType::Mock),

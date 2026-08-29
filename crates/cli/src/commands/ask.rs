@@ -16,7 +16,7 @@ use archaeologist_core::models::{File, Repository, Symbol, SymbolDependency};
 use archaeologist_db::{
     create_pool, repositories::get_commit, repositories::get_evidence_for_symbol,
     repositories::get_file, repositories::get_repository, repositories::list_repositories,
-    repositories::list_symbol_dependencies, repositories::list_symbol_commits, run_migrations,
+    repositories::list_symbol_commits, repositories::list_symbol_dependencies, run_migrations,
 };
 use archaeologist_evidence::{aggregate_evidence, explain_symbol, EvidenceItem, Explanation};
 use archaeologist_llm::{
@@ -78,86 +78,23 @@ pub async fn run(opts: AskOptions) -> Result<()> {
     }
 
     // ── 3. Search for relevant symbols ────────────────────────────────────────
-    let mut seen_ids = std::collections::HashSet::new();
-    let mut symbols = Vec::new();
-
-    for kw in &keywords {
-        let mut q = SymbolQuery::new(kw).limit(5);
-        if let Some(ref lang) = opts.language {
-            q = q.language(lang.as_str());
-        }
-        if let Some(rid) = repo_filter {
-            q = q.repo(rid);
-        }
-        let result = search_symbols(&pool, &q).await.context("symbol search")?;
-        for sym in result.items {
-            if seen_ids.insert(sym.id) {
-                symbols.push(sym);
-            }
-        }
-    }
+    let symbols = search_question_symbols(&pool, &opts, keywords, repo_filter).await?;
 
     println!("Question: {}\n", opts.question);
 
     if symbols.is_empty() {
         println!("No symbols found matching: {:?}", opts.question);
         if opts.repo.is_some() {
-            println!("Tip: check that the repository is indexed and --repo matches its name or URL.");
+            println!(
+                "Tip: check that the repository is indexed and --repo matches its name or URL."
+            );
         } else {
             println!("Tip: index a repository first with `archaeologist index <path>`.");
         }
     }
 
     // ── 4. Per-symbol: fetch rich context + aggregate evidence ────────────────
-    let mut bundles: Vec<SymbolBundle> = Vec::new();
-
-    for sym in symbols.iter().take(3) {
-        // File that contains this symbol.
-        let file = get_file(&pool, sym.file_id).await.unwrap_or_default();
-
-        // Repository the symbol belongs to.
-        let repo = get_repository(&pool, sym.repository_id)
-            .await
-            .unwrap_or_default();
-
-        // Dependency edges.
-        let deps = list_symbol_dependencies(&pool, sym.id)
-            .await
-            .unwrap_or_default();
-
-        // Sibling symbols: all symbols in the same file, excluding self.
-        let siblings = if let Some(ref f) = file {
-            fetch_siblings(&pool, f.id, sym.id).await
-        } else {
-            vec![]
-        };
-
-        // Commit history for evidence.
-        let sc_links = list_symbol_commits(&pool, sym.id).await.unwrap_or_default();
-        let mut commits = Vec::new();
-        for link in &sc_links {
-            if let Ok(Some(c)) = get_commit(&pool, link.commit_id).await {
-                commits.push(c);
-            }
-        }
-
-        let db_ev = get_evidence_for_symbol(&pool, sym.id)
-            .await
-            .unwrap_or_default();
-
-        let evidence = aggregate_evidence(sym.id, Some(sym), &commits, &[], &db_ev);
-        let explanation = explain_symbol(&sym.name, &evidence);
-
-        bundles.push(SymbolBundle {
-            symbol: sym.clone(),
-            file,
-            repo,
-            deps,
-            siblings,
-            evidence,
-            explanation,
-        });
-    }
+    let bundles = build_bundles(&pool, &symbols).await;
 
     // ── 5 & 6. LLM answer or rule-based fallback ─────────────────────────────
     match try_llm_answer(&opts.question, &bundles).await {
@@ -185,6 +122,92 @@ pub async fn run(opts: AskOptions) -> Result<()> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/// Search symbols matching the extracted keywords, optionally restricted to a
+/// repository. Deduplicates results across keywords.
+async fn search_question_symbols(
+    pool: &PgPool,
+    opts: &AskOptions,
+    keywords: Vec<String>,
+    repo_filter: Option<Uuid>,
+) -> Result<Vec<Symbol>> {
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut symbols = Vec::new();
+
+    for kw in &keywords {
+        let mut q = SymbolQuery::new(kw).limit(5);
+        if let Some(ref lang) = opts.language {
+            q = q.language(lang.as_str());
+        }
+        if let Some(rid) = repo_filter {
+            q = q.repo(rid);
+        }
+        let result = search_symbols(pool, &q).await.context("symbol search")?;
+        for sym in result.items {
+            if seen_ids.insert(sym.id) {
+                symbols.push(sym);
+            }
+        }
+    }
+
+    Ok(symbols)
+}
+
+/// Fetch rich context (file, repo, deps, siblings, evidence) for the top
+/// symbols and bundle it for the prompt builder / fallback explainer.
+async fn build_bundles(pool: &PgPool, symbols: &[Symbol]) -> Vec<SymbolBundle> {
+    let mut bundles: Vec<SymbolBundle> = Vec::new();
+
+    for sym in symbols.iter().take(3) {
+        // File that contains this symbol.
+        let file = get_file(pool, sym.file_id).await.unwrap_or_default();
+
+        // Repository the symbol belongs to.
+        let repo = get_repository(pool, sym.repository_id)
+            .await
+            .unwrap_or_default();
+
+        // Dependency edges.
+        let deps = list_symbol_dependencies(pool, sym.id)
+            .await
+            .unwrap_or_default();
+
+        // Sibling symbols: all symbols in the same file, excluding self.
+        let siblings = if let Some(ref f) = file {
+            fetch_siblings(pool, f.id, sym.id).await
+        } else {
+            vec![]
+        };
+
+        // Commit history for evidence.
+        let sc_links = list_symbol_commits(pool, sym.id).await.unwrap_or_default();
+        let mut commits = Vec::new();
+        for link in &sc_links {
+            if let Ok(Some(c)) = get_commit(pool, link.commit_id).await {
+                commits.push(c);
+            }
+        }
+
+        let db_ev = get_evidence_for_symbol(pool, sym.id)
+            .await
+            .unwrap_or_default();
+
+        let evidence = aggregate_evidence(sym.id, Some(sym), &commits, &[], &db_ev);
+        let explanation = explain_symbol(&sym.name, &evidence);
+
+        bundles.push(SymbolBundle {
+            symbol: sym.clone(),
+            file,
+            repo,
+            deps,
+            siblings,
+            evidence,
+            explanation,
+        });
+    }
+
+    bundles
+}
+
 /// Resolve a user-supplied `--repo` hint to a repository UUID.
 ///
 /// Accepts (in order of preference):
@@ -201,9 +224,7 @@ pub async fn resolve_repo(pool: &PgPool, hint: &str) -> Result<Uuid> {
         return Ok(id);
     }
 
-    let repos = list_repositories(pool)
-        .await
-        .context("list repositories")?;
+    let repos = list_repositories(pool).await.context("list repositories")?;
 
     // 2. Exact name.
     if let Some(r) = repos.iter().find(|r| r.name == hint) {
