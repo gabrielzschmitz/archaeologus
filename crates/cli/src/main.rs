@@ -170,10 +170,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Mcp { transport, port } => {
             init_tracing(&config.rust_log);
-            tracing::info!("Starting MCP server (transport: {transport}, port: {port})");
+            tracing::info!("Starting MCP server (transport={transport}, port={port})");
             let pool = archaeologist_db::create_pool(&config.database_url).await?;
             archaeologist_db::run_migrations(&pool).await?;
-            println!("MCP server started");
+            run_mcp_server(pool, &transport, port).await?;
         }
         Commands::Serve { addr } => {
             init_tracing(&config.rust_log);
@@ -198,4 +198,50 @@ fn init_tracing(filter: &str) {
         .with_env_filter(filter)
         .try_init()
         .ok();
+}
+
+async fn run_mcp_server(
+    pool: archaeologist_db::PgPool,
+    transport: &str,
+    port: u16,
+) -> anyhow::Result<()> {
+    use archaeologist_mcp::ArchaeologistServer;
+    use rmcp::ServiceExt;
+
+    let server = ArchaeologistServer::new(pool);
+
+    match transport {
+        "stdio" => {
+            tracing::info!("MCP server listening on stdio");
+            let service = server.serve(rmcp::transport::io::stdio()).await?;
+            service.waiting().await?;
+        }
+        "http" => {
+            use rmcp::transport::streamable_http_server::{
+                StreamableHttpServerConfig, StreamableHttpService,
+            };
+            use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
+            use std::sync::Arc;
+
+            let addr = format!("0.0.0.0:{port}");
+            tracing::info!("MCP server listening on http://{addr}/mcp");
+
+            let pool = server.pool.clone();
+            let mcp_service = StreamableHttpService::new(
+                move || Ok(ArchaeologistServer::new(pool.clone())),
+                Arc::new(LocalSessionManager::default()),
+                StreamableHttpServerConfig::default(),
+            );
+
+            let app = axum::Router::new().route_service("/mcp", mcp_service);
+
+            let listener = tokio::net::TcpListener::bind(&addr).await?;
+            axum::serve(listener, app).await?;
+        }
+        other => {
+            anyhow::bail!("Unknown MCP transport: '{other}'. Use 'stdio' or 'http'.");
+        }
+    }
+
+    Ok(())
 }

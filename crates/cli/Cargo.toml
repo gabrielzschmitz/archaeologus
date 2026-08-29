@@ -20,6 +20,10 @@ archaeologist-indexer = { workspace = true }
 archaeologist-evidence = { workspace = true }
 archaeologist-search = { workspace = true }
 archaeologist-api = { workspace = true }
+archaeologist-mcp = { workspace = true }
+archaeologist-llm = { workspace = true }
+rmcp = { workspace = true }
+axum = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

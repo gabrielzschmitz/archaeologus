@@ -16,6 +16,8 @@ archaeologist-indexer = { path = "crates/indexer" }
 archaeologist-search = { path = "crates/search" }
 archaeologist-evidence = { path = "crates/evidence" }
 archaeologist-api = { path = "crates/api" }
+archaeologist-mcp = { path = "crates/mcp" }
+archaeologist-llm = { path = "crates/llm" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -30,8 +32,21 @@ clap = { version = "4", features = ["derive"] }
 # Date-time
 jiff = { version = "0.2", features = ["serde"] }
 
-# HTTP client (for future use)
+# HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# MCP protocol
+rmcp = { version = "3.1.4", features = [
+    "server",
+    "macros",
+    "transport-io",
+    "transport-streamable-http-server",
+    "schemars",
+] }
+schemars = { version = "1", features = ["uuid1"] }
+
+# Async traits
+async-trait = "0.1"
 
 # Database
 sqlx = { version = "0.8", features = [
