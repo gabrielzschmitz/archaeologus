@@ -1,4 +1,4 @@
-//! `archaeologist-search` — symbol and code search using PostgreSQL `pg_trgm`.
+//! `archaeologist-search` — symbol and code search using `PostgreSQL` `pg_trgm`.
 //!
 //! # Quick start
 //! ```no_run

@@ -1,5 +1,4 @@
-mod commands;
-
+use archaeologist_cli::commands;
 use archaeologist_core::AppConfig;
 use clap::{Parser, Subcommand};
 
@@ -46,21 +45,33 @@ enum Commands {
     Ask {
         /// Your question
         question: String,
+        /// Filter by language (rust, python, go, …)
+        #[arg(short, long)]
+        language: Option<String>,
     },
     /// Explain a symbol's purpose and history
     Explain {
         /// Symbol name or file path
         target: String,
+        /// Filter by language (rust, python, go, …)
+        #[arg(short, long)]
+        language: Option<String>,
     },
     /// Show commit history for a symbol
     History {
         /// Symbol name
         symbol: String,
+        /// Filter by language (rust, python, go, …)
+        #[arg(short, long)]
+        language: Option<String>,
     },
     /// Analyze impact of changing a symbol
     Impact {
         /// Symbol name
         symbol: String,
+        /// Filter by language (rust, python, go, …)
+        #[arg(short, long)]
+        language: Option<String>,
     },
     /// Start MCP server for AI client connections
     Mcp {
@@ -115,33 +126,41 @@ async fn main() -> anyhow::Result<()> {
             .await?;
         }
 
-        Commands::Ask { question } => {
-            init_tracing(&config.rust_log);
-            tracing::info!("Asking: {question}");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
-            println!("Answer for: {question}");
+        Commands::Ask { question, language } => {
+            commands::ask::run(commands::ask::AskOptions {
+                question,
+                language,
+                database_url: config.database_url,
+                rust_log: config.rust_log,
+            })
+            .await?;
         }
-        Commands::Explain { target } => {
-            init_tracing(&config.rust_log);
-            tracing::info!("Explaining: {target}");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
-            println!("Explanation for: {target}");
+        Commands::Explain { target, language } => {
+            commands::explain::run(commands::explain::ExplainOptions {
+                target,
+                language,
+                database_url: config.database_url,
+                rust_log: config.rust_log,
+            })
+            .await?;
         }
-        Commands::History { symbol } => {
-            init_tracing(&config.rust_log);
-            tracing::info!("History for: {symbol}");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
-            println!("History for: {symbol}");
+        Commands::History { symbol, language } => {
+            commands::history::run(commands::history::HistoryOptions {
+                symbol,
+                language,
+                database_url: config.database_url,
+                rust_log: config.rust_log,
+            })
+            .await?;
         }
-        Commands::Impact { symbol } => {
-            init_tracing(&config.rust_log);
-            tracing::info!("Impact analysis for: {symbol}");
-            let pool = archaeologist_db::create_pool(&config.database_url).await?;
-            archaeologist_db::run_migrations(&pool).await?;
-            println!("Impact analysis for: {symbol}");
+        Commands::Impact { symbol, language } => {
+            commands::impact::run(commands::impact::ImpactOptions {
+                symbol,
+                language,
+                database_url: config.database_url,
+                rust_log: config.rust_log,
+            })
+            .await?;
         }
         Commands::Mcp { transport, port } => {
             init_tracing(&config.rust_log);

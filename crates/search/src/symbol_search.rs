@@ -1,4 +1,4 @@
-//! Symbol search backed by PostgreSQL `pg_trgm`.
+//! Symbol search backed by `PostgreSQL` `pg_trgm`.
 //!
 //! Two search modes:
 //!
