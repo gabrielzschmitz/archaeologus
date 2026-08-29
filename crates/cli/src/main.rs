@@ -217,10 +217,10 @@ async fn run_mcp_server(
             service.waiting().await?;
         }
         "http" => {
+            use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
             use rmcp::transport::streamable_http_server::{
                 StreamableHttpServerConfig, StreamableHttpService,
             };
-            use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
             use std::sync::Arc;
 
             let addr = format!("0.0.0.0:{port}");

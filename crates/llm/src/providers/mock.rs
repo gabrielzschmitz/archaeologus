@@ -22,7 +22,9 @@ impl MockProvider {
 
     #[must_use]
     pub fn with_response(response: impl Into<String>) -> Self {
-        Self { response: response.into() }
+        Self {
+            response: response.into(),
+        }
     }
 }
 

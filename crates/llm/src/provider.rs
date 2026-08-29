@@ -15,17 +15,26 @@ pub struct ChatMessage {
 impl ChatMessage {
     #[must_use]
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: Role::System, content: content.into() }
+        Self {
+            role: Role::System,
+            content: content.into(),
+        }
     }
 
     #[must_use]
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: Role::User, content: content.into() }
+        Self {
+            role: Role::User,
+            content: content.into(),
+        }
     }
 
     #[must_use]
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: Role::Assistant, content: content.into() }
+        Self {
+            role: Role::Assistant,
+            content: content.into(),
+        }
     }
 }
 
@@ -98,7 +107,9 @@ impl std::str::FromStr for ProviderType {
             "anthropic" | "claude" => Ok(ProviderType::Anthropic),
             "ollama" | "local" => Ok(ProviderType::Ollama),
             "mock" | "test" => Ok(ProviderType::Mock),
-            _ => Err(LLMError::ProviderUnavailable(format!("Unknown provider: {s}"))),
+            _ => Err(LLMError::ProviderUnavailable(format!(
+                "Unknown provider: {s}"
+            ))),
         }
     }
 }

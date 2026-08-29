@@ -15,7 +15,11 @@ pub struct OllamaProvider {
 impl OllamaProvider {
     #[must_use]
     pub fn new(base_url: String, model: String) -> Self {
-        Self { client: reqwest::Client::new(), base_url, model }
+        Self {
+            client: reqwest::Client::new(),
+            base_url,
+            model,
+        }
     }
 
     /// Create from environment variables.
@@ -85,7 +89,9 @@ impl LLMProvider for OllamaProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(LLMError::ApiError(format!("Ollama error ({status}): {body}")));
+            return Err(LLMError::ApiError(format!(
+                "Ollama error ({status}): {body}"
+            )));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -94,7 +100,11 @@ impl LLMProvider for OllamaProvider {
             .unwrap_or("")
             .to_string();
 
-        Ok(ChatResponse { content, tokens_used: None, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used: None,
+            model: self.model.clone(),
+        })
     }
 
     async fn chat_with_tools(
@@ -140,7 +150,9 @@ impl LLMProvider for OllamaProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(LLMError::ApiError(format!("Ollama error ({status}): {body}")));
+            return Err(LLMError::ApiError(format!(
+                "Ollama error ({status}): {body}"
+            )));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -149,6 +161,10 @@ impl LLMProvider for OllamaProvider {
             .unwrap_or("")
             .to_string();
 
-        Ok(ChatResponse { content, tokens_used: None, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used: None,
+            model: self.model.clone(),
+        })
     }
 }

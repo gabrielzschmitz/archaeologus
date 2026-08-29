@@ -15,7 +15,11 @@ pub struct AnthropicProvider {
 impl AnthropicProvider {
     #[must_use]
     pub fn new(api_key: String, model: String) -> Self {
-        Self { client: reqwest::Client::new(), api_key, model }
+        Self {
+            client: reqwest::Client::new(),
+            api_key,
+            model,
+        }
     }
 
     /// Create from environment variables.
@@ -94,7 +98,9 @@ impl LLMProvider for AnthropicProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(LLMError::ApiError(format!("Anthropic error ({status}): {body}")));
+            return Err(LLMError::ApiError(format!(
+                "Anthropic error ({status}): {body}"
+            )));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -105,9 +111,13 @@ impl LLMProvider for AnthropicProvider {
         let tokens_used = data["usage"]["input_tokens"]
             .as_u64()
             .zip(data["usage"]["output_tokens"].as_u64())
-            .map(|(i, o)| (i + o) as u32);
+            .and_then(|(i, o)| u32::try_from(i + o).ok());
 
-        Ok(ChatResponse { content, tokens_used, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used,
+            model: self.model.clone(),
+        })
     }
 
     async fn chat_with_tools(
@@ -155,7 +165,9 @@ impl LLMProvider for AnthropicProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(LLMError::ApiError(format!("Anthropic error ({status}): {body}")));
+            return Err(LLMError::ApiError(format!(
+                "Anthropic error ({status}): {body}"
+            )));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -166,8 +178,12 @@ impl LLMProvider for AnthropicProvider {
         let tokens_used = data["usage"]["input_tokens"]
             .as_u64()
             .zip(data["usage"]["output_tokens"].as_u64())
-            .map(|(i, o)| (i + o) as u32);
+            .and_then(|(i, o)| u32::try_from(i + o).ok());
 
-        Ok(ChatResponse { content, tokens_used, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used,
+            model: self.model.clone(),
+        })
     }
 }

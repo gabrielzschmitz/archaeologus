@@ -1,17 +1,26 @@
 //! MCP server — [`ArchaeologistServer`] exposes all archaeologist capabilities
 //! as MCP tools via the rmcp crate.
 
+use archaeologist_core::models::Symbol;
+use archaeologist_db::repositories::{
+    get_commit, get_evidence_for_symbol, list_symbol_commits, list_symbol_dependencies,
+};
+use archaeologist_evidence::{
+    aggregate_evidence, collect_from_commits, collect_from_db, deduplicate_and_rank,
+    explain_symbol as ev_explain_symbol,
+};
+use archaeologist_search::code_search::{search_code, CodeQuery};
+use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
 use rmcp::{
-    ServerHandler,
-    handler::server::router::tool::ToolRouter,
-    handler::server::wrapper::Parameters,
-    model::ServerInfo,
-    tool, tool_handler, tool_router,
+    handler::server::router::tool::ToolRouter, handler::server::wrapper::Parameters,
+    model::ServerInfo, tool, tool_handler, tool_router, ServerHandler,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
 use sqlx::PgPool;
+use std::collections::{HashMap, HashSet};
 use tracing::info;
+use uuid::Uuid;
 
 // ── Tool input types ──────────────────────────────────────────────────────────
 // Each tool gets its own `#[derive(Deserialize, JsonSchema)]` input struct so
@@ -106,6 +115,7 @@ pub struct ArchaeologistServer {
 }
 
 // Wire the `#[tool]` methods into the tool router.
+#[allow(clippy::unused_async_trait_impl)]
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for ArchaeologistServer {
     fn get_info(&self) -> ServerInfo {
@@ -125,7 +135,8 @@ impl ServerHandler for ArchaeologistServer {
 #[tool_router(router = tool_router)]
 impl ArchaeologistServer {
     /// Create a new server instance.
-    #[must_use] pub fn new(pool: PgPool) -> Self {
+    #[must_use]
+    pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
             tool_router: Self::tool_router(),
@@ -134,7 +145,9 @@ impl ArchaeologistServer {
 
     // ── index_repository ─────────────────────────────────────────────────────
 
-    #[tool(description = "Index a git repository for analysis. Clones the repository if needed and indexes all source files. Returns indexing statistics.")]
+    #[tool(
+        description = "Index a git repository for analysis. Clones the repository if needed and indexes all source files. Returns indexing statistics."
+    )]
     pub async fn index_repository(
         &self,
         params: Parameters<IndexRepositoryInput>,
@@ -148,13 +161,14 @@ impl ArchaeologistServer {
 
     // ── search_symbols ────────────────────────────────────────────────────────
 
-    #[tool(description = "Search for symbols (functions, structs, enums, traits, classes, …) in indexed repositories.")]
+    #[tool(
+        description = "Search for symbols (functions, structs, enums, traits, classes, …) in indexed repositories."
+    )]
     pub async fn search_symbols(
         &self,
         params: Parameters<SearchSymbolsInput>,
     ) -> Result<String, rmcp::ErrorData> {
         let input = params.0;
-        use archaeologist_search::symbol_search::{SymbolQuery, search_symbols};
 
         let mut q = SymbolQuery::new(&input.query).limit(input.limit.unwrap_or(20));
         if let Some(repo_id) = input.repository_id {
@@ -190,11 +204,6 @@ impl ArchaeologistServer {
         params: Parameters<ExplainSymbolInput>,
     ) -> Result<String, rmcp::ErrorData> {
         let input = params.0;
-        use archaeologist_db::repositories::{
-            get_commit, get_evidence_for_symbol, list_symbol_commits, list_symbol_dependencies,
-        };
-        use archaeologist_evidence::{aggregate_evidence, explain_symbol as ev_explain_symbol};
-        use archaeologist_search::symbol_search::{SymbolQuery, search_symbols};
 
         let mut q = SymbolQuery::new(&input.symbol_name).limit(5);
         if let Some(repo_id) = input.repository_id {
@@ -219,7 +228,9 @@ impl ArchaeologistServer {
 
         for sym in &result.items {
             // Fetch commits.
-            let sc_links = list_symbol_commits(&self.pool, sym.id).await.unwrap_or_default();
+            let sc_links = list_symbol_commits(&self.pool, sym.id)
+                .await
+                .unwrap_or_default();
             let mut commits = Vec::new();
             for link in &sc_links {
                 if let Ok(Some(c)) = get_commit(&self.pool, link.commit_id).await {
@@ -284,10 +295,8 @@ impl ArchaeologistServer {
         params: Parameters<GetHistoryInput>,
     ) -> Result<String, rmcp::ErrorData> {
         let input = params.0;
-        use archaeologist_db::repositories::{get_commit, list_symbol_commits};
-        use archaeologist_search::symbol_search::{SymbolQuery, search_symbols};
 
-        let limit = i64::from(input.limit.unwrap_or(50));
+        let limit = usize::try_from(input.limit.unwrap_or(50)).unwrap_or(usize::MAX);
         let mut q = SymbolQuery::new(&input.symbol_name).limit(5);
         if let Some(repo_id) = input.repository_id {
             q = q.repo(repo_id);
@@ -309,7 +318,9 @@ impl ArchaeologistServer {
 
         let mut all_history = Vec::new();
         for sym in &result.items {
-            let sc_links = list_symbol_commits(&self.pool, sym.id).await.unwrap_or_default();
+            let sc_links = list_symbol_commits(&self.pool, sym.id)
+                .await
+                .unwrap_or_default();
             let mut commits = Vec::new();
             for link in &sc_links {
                 if let Ok(Some(c)) = get_commit(&self.pool, link.commit_id).await {
@@ -321,7 +332,7 @@ impl ArchaeologistServer {
 
             let history: Vec<serde_json::Value> = commits
                 .iter()
-                .take(limit as usize)
+                .take(limit)
                 .map(|(c, ct)| {
                     serde_json::json!({
                         "sha": &c.sha[..c.sha.len().min(8)],
@@ -352,16 +363,14 @@ impl ArchaeologistServer {
 
     // ── analyze_impact ────────────────────────────────────────────────────────
 
-    #[tool(description = "Analyze the impact of changing a symbol — direct callers, indirect callers, tests, and risk level.")]
+    #[tool(
+        description = "Analyze the impact of changing a symbol — direct callers, indirect callers, tests, and risk level."
+    )]
     pub async fn analyze_impact(
         &self,
         params: Parameters<AnalyzeImpactInput>,
     ) -> Result<String, rmcp::ErrorData> {
         let input = params.0;
-        use archaeologist_core::models::Symbol;
-        use archaeologist_search::symbol_search::{SymbolQuery, search_symbols};
-        use std::collections::HashSet;
-        use uuid::Uuid;
 
         let mut q = SymbolQuery::new(&input.symbol_name).limit(5);
         if let Some(repo_id) = input.repository_id {
@@ -402,7 +411,11 @@ impl ArchaeologistServer {
                 n.starts_with("test") || n.ends_with("_test") || n.contains("_test_")
             };
 
-            let test_count = direct.iter().chain(indirect.iter()).filter(|s| is_test(s)).count();
+            let test_count = direct
+                .iter()
+                .chain(indirect.iter())
+                .filter(|s| is_test(s))
+                .count();
             let total = direct.len() + indirect.len();
             let risk = estimate_risk(total, test_count);
 
@@ -432,19 +445,14 @@ impl ArchaeologistServer {
 
     // ── get_evidence ──────────────────────────────────────────────────────────
 
-    #[tool(description = "Get all evidence for why a piece of code exists — commits, blame, doc comments, and database records.")]
+    #[tool(
+        description = "Get all evidence for why a piece of code exists — commits, blame, doc comments, and database records."
+    )]
     pub async fn get_evidence(
         &self,
         params: Parameters<GetEvidenceInput>,
     ) -> Result<String, rmcp::ErrorData> {
         let input = params.0;
-        use archaeologist_db::repositories::{
-            get_commit, get_evidence_for_symbol, list_symbol_commits,
-        };
-        use archaeologist_evidence::{
-            collect_from_commits, collect_from_db, deduplicate_and_rank,
-        };
-        use archaeologist_search::symbol_search::{SymbolQuery, search_symbols};
 
         let mut q = SymbolQuery::new(&input.symbol_name).limit(5);
         if let Some(repo_id) = input.repository_id {
@@ -467,7 +475,9 @@ impl ArchaeologistServer {
 
         let mut all_evidence = Vec::new();
         for sym in &result.items {
-            let sc_links = list_symbol_commits(&self.pool, sym.id).await.unwrap_or_default();
+            let sc_links = list_symbol_commits(&self.pool, sym.id)
+                .await
+                .unwrap_or_default();
             let mut commits = Vec::new();
             for link in &sc_links {
                 if let Ok(Some(c)) = get_commit(&self.pool, link.commit_id).await {
@@ -505,7 +515,6 @@ impl ArchaeologistServer {
         params: Parameters<SearchCodeInput>,
     ) -> Result<String, rmcp::ErrorData> {
         let input = params.0;
-        use archaeologist_search::code_search::{CodeQuery, search_code};
 
         let mut q = CodeQuery::new(&input.query).limit(input.limit.unwrap_or(20));
         if let Some(repo_id) = input.repository_id {
@@ -584,27 +593,45 @@ async fn index_repository_impl(
     target: &str,
     branch: Option<&str>,
 ) -> anyhow::Result<String> {
-    use std::collections::HashMap;
-
     use anyhow::Context;
-    use archaeologist_core::models::{
-        BranchCreate, CommitCreate, CommitFileCreate, FileCreate, RepositoryCreate,
-        SymbolCommitCreate, SymbolCreate, SymbolDependencyCreate, TagCreate,
-    };
-    use archaeologist_db::repositories::{
-        create_commit, create_commit_file, create_file, create_repository, create_symbol,
-        create_symbol_dependency, get_commit_by_sha, get_file_by_path, get_repository_by_url,
-        update_repository_indexed, upsert_branch, upsert_symbol_commit, upsert_tag,
-    };
-    use archaeologist_git::{
-        diff_commit, list_branches, list_tags, walk_commits, CloneOptions, WalkFilter,
-    };
+    use archaeologist_db::repositories::update_repository_indexed;
     use archaeologist_indexer::index_directory;
-    use sha2::{Digest, Sha256};
-    use tracing::warn;
-    use uuid::Uuid;
 
-    // ── 1. Resolve local path ─────────────────────────────────────────────────
+    let (local_path, canonical_url) = resolve_local_path(target)?;
+
+    let repo_id = upsert_repository(pool, &canonical_url, &local_path, branch).await?;
+
+    let indexed = index_directory(&local_path, |_, _| {}).context("index directory")?;
+
+    let (files_stored, symbols_stored, file_id_map) =
+        store_files_and_symbols(pool, repo_id, &local_path, &indexed).await?;
+
+    let (commits_stored, commit_id_map) = store_commits(pool, repo_id, &local_path).await?;
+
+    let commit_files_stored = store_commit_files(pool, &local_path, &commit_id_map).await?;
+
+    let symbol_commits_stored =
+        store_symbol_commits(pool, &local_path, &commit_id_map, &file_id_map).await?;
+
+    let (branches_stored, tags_stored) = store_refs(pool, repo_id, &local_path).await?;
+
+    let deps_stored =
+        store_dependencies(pool, repo_id, &local_path, &indexed, &file_id_map).await?;
+
+    update_repository_indexed(pool, repo_id).await.ok();
+
+    Ok(format!(
+        "Indexed '{canonical_url}': {files_stored} files, {symbols_stored} symbols, \
+         {commits_stored} commits, {commit_files_stored} commit_files, \
+         {symbol_commits_stored} symbol_commits, {branches_stored} branches, \
+         {tags_stored} tags, {deps_stored} dependencies"
+    ))
+}
+
+fn resolve_local_path(target: &str) -> anyhow::Result<(std::path::PathBuf, String)> {
+    use anyhow::Context;
+    use archaeologist_git::CloneOptions;
+
     let is_url = target.contains("://") || target.starts_with("git@");
     let (local_path, canonical_url) = if is_url {
         let cache_dir = std::path::PathBuf::from("/tmp/archaeologist-cache");
@@ -623,13 +650,26 @@ async fn index_repository_impl(
         (dest, target.to_string())
     } else {
         let path = std::path::PathBuf::from(target);
-        let abs = path.canonicalize().with_context(|| format!("resolve path '{target}'"))?;
+        let abs = path
+            .canonicalize()
+            .with_context(|| format!("resolve path '{target}'"))?;
         let url = format!("file://{}", abs.display());
         (abs, url)
     };
+    Ok((local_path, canonical_url))
+}
 
-    // ── 2. Upsert repository record ───────────────────────────────────────────
-    let repo = if let Some(existing) = get_repository_by_url(pool, &canonical_url)
+async fn upsert_repository(
+    pool: &PgPool,
+    canonical_url: &str,
+    local_path: &std::path::Path,
+    branch: Option<&str>,
+) -> anyhow::Result<Uuid> {
+    use anyhow::Context;
+    use archaeologist_core::models::RepositoryCreate;
+    use archaeologist_db::repositories::{create_repository, get_repository_by_url};
+
+    let repo = if let Some(existing) = get_repository_by_url(pool, canonical_url)
         .await
         .context("look up repository")?
     {
@@ -644,24 +684,63 @@ async fn index_repository_impl(
             .to_string();
         let create = RepositoryCreate {
             name,
-            url: canonical_url.clone(),
+            url: canonical_url.to_string(),
             local_path: Some(local_path.to_string_lossy().into_owned()),
             description: None,
             default_branch: branch.map(str::to_string),
         };
-        create_repository(pool, &create).await.context("create repository")?
+        create_repository(pool, &create)
+            .await
+            .context("create repository")?
     };
-    let repo_id = repo.id;
+    Ok(repo.id)
+}
 
-    // ── 3. Index source files ─────────────────────────────────────────────────
-    let indexed = index_directory(&local_path, |_, _| {}).context("index directory")?;
+async fn store_commit_files(
+    pool: &PgPool,
+    local_path: &std::path::Path,
+    commit_id_map: &HashMap<String, Uuid>,
+) -> anyhow::Result<usize> {
+    use archaeologist_core::models::CommitFileCreate;
+    use archaeologist_db::repositories::create_commit_file;
+    use archaeologist_git::diff_commit;
 
-    // ── 4. Store files + symbols ──────────────────────────────────────────────
+    let mut commit_files_stored: usize = 0;
+    for (sha, &cid) in commit_id_map {
+        let dfs = diff_commit(local_path, sha).unwrap_or_default();
+        for df in &dfs {
+            let cf = CommitFileCreate {
+                commit_id: cid,
+                file_path: df.file_path.clone(),
+                status: format!("{:?}", df.status).to_lowercase(),
+                additions: i32::try_from(df.additions).unwrap_or(i32::MAX),
+                deletions: i32::try_from(df.deletions).unwrap_or(i32::MAX),
+                old_path: df.old_path.clone(),
+            };
+            if create_commit_file(pool, &cf).await.is_ok() {
+                commit_files_stored += 1;
+            }
+        }
+    }
+    Ok(commit_files_stored)
+}
+
+async fn store_files_and_symbols(
+    pool: &PgPool,
+    repo_id: Uuid,
+    local_path: &std::path::Path,
+    indexed: &[archaeologist_indexer::IndexedFile],
+) -> anyhow::Result<(usize, usize, HashMap<String, Uuid>)> {
+    use archaeologist_core::models::{FileCreate, SymbolCreate};
+    use archaeologist_db::repositories::{create_file, create_symbol, get_file_by_path};
+    use sha2::{Digest, Sha256};
+    use tracing::warn;
+
     let mut files_stored: usize = 0;
     let mut symbols_stored: usize = 0;
     let mut file_id_map: HashMap<String, Uuid> = HashMap::new();
 
-    for indexed_file in &indexed {
+    for indexed_file in indexed {
         let raw = match std::fs::read(&indexed_file.path) {
             Ok(b) => b,
             Err(e) => {
@@ -673,7 +752,7 @@ async fn index_repository_impl(
         let size_bytes = i64::try_from(raw.len()).unwrap_or(i64::MAX);
         let rel_path = indexed_file
             .path
-            .strip_prefix(&local_path)
+            .strip_prefix(local_path)
             .unwrap_or(&indexed_file.path)
             .to_string_lossy()
             .into_owned();
@@ -728,8 +807,23 @@ async fn index_repository_impl(
         }
     }
 
-    // ── 5. Store commits ──────────────────────────────────────────────────────
-    let commits = walk_commits(&local_path, &WalkFilter::default()).unwrap_or_default();
+    Ok((files_stored, symbols_stored, file_id_map))
+}
+
+async fn store_commits(
+    pool: &PgPool,
+    repo_id: Uuid,
+    local_path: &std::path::Path,
+) -> anyhow::Result<(usize, HashMap<String, Uuid>)> {
+    use std::collections::HashMap;
+
+    use archaeologist_core::models::CommitCreate;
+    use archaeologist_db::repositories::{create_commit, get_commit_by_sha};
+    use archaeologist_git::{walk_commits, WalkFilter};
+    use tracing::warn;
+    use uuid::Uuid;
+
+    let commits = walk_commits(local_path, &WalkFilter::default()).unwrap_or_default();
     let mut commits_stored: usize = 0;
     let mut commit_id_map: HashMap<String, Uuid> = HashMap::new();
     for ci in &commits {
@@ -765,40 +859,32 @@ async fn index_repository_impl(
         }
     }
 
-    // ── 6. Commit files ───────────────────────────────────────────────────────
-    let mut commit_files_stored: usize = 0;
-    for (sha, &cid) in &commit_id_map {
-        let dfs = diff_commit(&local_path, sha).unwrap_or_default();
-        for df in &dfs {
-            let cf = CommitFileCreate {
-                commit_id: cid,
-                file_path: df.file_path.clone(),
-                status: format!("{:?}", df.status).to_lowercase(),
-                additions: i32::try_from(df.additions).unwrap_or(i32::MAX),
-                deletions: i32::try_from(df.deletions).unwrap_or(i32::MAX),
-                old_path: df.old_path.clone(),
-            };
-            if create_commit_file(pool, &cf).await.is_ok() {
-                commit_files_stored += 1;
-            }
-        }
-    }
+    Ok((commits_stored, commit_id_map))
+}
 
-    // ── 7. Symbol commits ─────────────────────────────────────────────────────
+async fn store_symbol_commits(
+    pool: &PgPool,
+    local_path: &std::path::Path,
+    commit_id_map: &HashMap<String, Uuid>,
+    file_id_map: &HashMap<String, Uuid>,
+) -> anyhow::Result<usize> {
+    use archaeologist_core::models::SymbolCommitCreate;
+    use archaeologist_db::repositories::upsert_symbol_commit;
+    use archaeologist_git::diff_commit;
+
     let mut symbol_commits_stored: usize = 0;
-    for (sha, &cid) in &commit_id_map {
-        let dfs = diff_commit(&local_path, sha).unwrap_or_default();
+    for (sha, &cid) in commit_id_map {
+        let dfs = diff_commit(local_path, sha).unwrap_or_default();
         for df in &dfs {
             let file_db_id = match file_id_map.get(&df.file_path) {
                 Some(id) => *id,
                 None => continue,
             };
-            let syms: Vec<(Uuid,)> =
-                sqlx::query_as("SELECT id FROM symbols WHERE file_id = $1")
-                    .bind(file_db_id)
-                    .fetch_all(pool)
-                    .await
-                    .unwrap_or_default();
+            let syms: Vec<(Uuid,)> = sqlx::query_as("SELECT id FROM symbols WHERE file_id = $1")
+                .bind(file_db_id)
+                .fetch_all(pool)
+                .await
+                .unwrap_or_default();
             let ct = match df.status {
                 archaeologist_git::FileStatus::Added => "added",
                 archaeologist_git::FileStatus::Deleted => "deleted",
@@ -816,10 +902,20 @@ async fn index_repository_impl(
             }
         }
     }
+    Ok(symbol_commits_stored)
+}
 
-    // ── 8. Refs ───────────────────────────────────────────────────────────────
+async fn store_refs(
+    pool: &PgPool,
+    repo_id: Uuid,
+    local_path: &std::path::Path,
+) -> anyhow::Result<(usize, usize)> {
+    use archaeologist_core::models::{BranchCreate, TagCreate};
+    use archaeologist_db::repositories::{upsert_branch, upsert_tag};
+    use archaeologist_git::{list_branches, list_tags};
+
     let mut branches_stored: usize = 0;
-    if let Ok(branches) = list_branches(&local_path) {
+    if let Ok(branches) = list_branches(local_path) {
         for b in &branches {
             let bc = BranchCreate {
                 repository_id: repo_id,
@@ -833,7 +929,7 @@ async fn index_repository_impl(
         }
     }
     let mut tags_stored: usize = 0;
-    if let Ok(tags) = list_tags(&local_path) {
+    if let Ok(tags) = list_tags(local_path) {
         for t in &tags {
             let tc = TagCreate {
                 repository_id: repo_id,
@@ -845,16 +941,27 @@ async fn index_repository_impl(
             }
         }
     }
+    Ok((branches_stored, tags_stored))
+}
 
-    // ── 9. Dependencies ───────────────────────────────────────────────────────
+async fn store_dependencies(
+    pool: &PgPool,
+    repo_id: Uuid,
+    local_path: &std::path::Path,
+    indexed: &[archaeologist_indexer::IndexedFile],
+    file_id_map: &HashMap<String, Uuid>,
+) -> anyhow::Result<usize> {
+    use archaeologist_core::models::SymbolDependencyCreate;
+    use archaeologist_db::repositories::create_symbol_dependency;
+
     let mut deps_stored: usize = 0;
-    for indexed_file in &indexed {
+    for indexed_file in indexed {
         if indexed_file.dependencies.is_empty() {
             continue;
         }
         let rel_path = indexed_file
             .path
-            .strip_prefix(&local_path)
+            .strip_prefix(local_path)
             .unwrap_or(&indexed_file.path)
             .to_string_lossy()
             .into_owned();
@@ -921,16 +1028,7 @@ async fn index_repository_impl(
             }
         }
     }
-
-    // ── 10. Mark indexed ──────────────────────────────────────────────────────
-    update_repository_indexed(pool, repo_id).await.ok();
-
-    Ok(format!(
-        "Indexed '{canonical_url}': {files_stored} files, {symbols_stored} symbols, \
-         {commits_stored} commits, {commit_files_stored} commit_files, \
-         {symbol_commits_stored} symbol_commits, {branches_stored} branches, \
-         {tags_stored} tags, {deps_stored} dependencies"
-    ))
+    Ok(deps_stored)
 }
 
 fn indexer_kind_to_core(
@@ -970,14 +1068,44 @@ mod tests {
             // Create a dummy pool-less check by verifying the generated router
             // contains the expected tool names.
             let routes = ArchaeologistServer::tool_router();
-            assert!(routes.list_all().iter().any(|t| t.name == "index_repository"), "index_repository tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "search_symbols"), "search_symbols tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "explain_symbol"), "explain_symbol tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "get_history"), "get_history tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "analyze_impact"), "analyze_impact tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "get_evidence"), "get_evidence tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "search_code"), "search_code tool missing");
-            assert!(routes.list_all().iter().any(|t| t.name == "list_repositories"), "list_repositories tool missing");
+            assert!(
+                routes
+                    .list_all()
+                    .iter()
+                    .any(|t| t.name == "index_repository"),
+                "index_repository tool missing"
+            );
+            assert!(
+                routes.list_all().iter().any(|t| t.name == "search_symbols"),
+                "search_symbols tool missing"
+            );
+            assert!(
+                routes.list_all().iter().any(|t| t.name == "explain_symbol"),
+                "explain_symbol tool missing"
+            );
+            assert!(
+                routes.list_all().iter().any(|t| t.name == "get_history"),
+                "get_history tool missing"
+            );
+            assert!(
+                routes.list_all().iter().any(|t| t.name == "analyze_impact"),
+                "analyze_impact tool missing"
+            );
+            assert!(
+                routes.list_all().iter().any(|t| t.name == "get_evidence"),
+                "get_evidence tool missing"
+            );
+            assert!(
+                routes.list_all().iter().any(|t| t.name == "search_code"),
+                "search_code tool missing"
+            );
+            assert!(
+                routes
+                    .list_all()
+                    .iter()
+                    .any(|t| t.name == "list_repositories"),
+                "list_repositories tool missing"
+            );
             routes.list_all().len()
         };
         assert_eq!(info, 8, "expected exactly 8 MCP tools");

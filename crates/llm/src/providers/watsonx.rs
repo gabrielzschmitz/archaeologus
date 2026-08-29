@@ -145,10 +145,7 @@ impl LLMProvider for WatsonxProvider {
             },
         });
 
-        let url = format!(
-            "{}/ml/v1/text/chat?version=2025-02-06",
-            self.base_url
-        );
+        let url = format!("{}/ml/v1/text/chat?version=2025-02-06", self.base_url);
 
         debug!(url = %url, model = %self.model, "watsonx chat request");
 
@@ -174,9 +171,13 @@ impl LLMProvider for WatsonxProvider {
         let tokens_used = data["usage"]["total_tokens"]
             .as_u64()
             .or_else(|| data["results"][0]["input_token_count"].as_u64())
-            .map(|v| v as u32);
+            .and_then(|v| u32::try_from(v).ok());
 
-        Ok(ChatResponse { content, tokens_used, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used,
+            model: self.model.clone(),
+        })
     }
 
     async fn chat_with_tools(
@@ -214,10 +215,7 @@ impl LLMProvider for WatsonxProvider {
             },
         });
 
-        let url = format!(
-            "{}/ml/v1/text/chat?version=2025-02-06",
-            self.base_url
-        );
+        let url = format!("{}/ml/v1/text/chat?version=2025-02-06", self.base_url);
 
         let resp = self
             .client
@@ -240,8 +238,12 @@ impl LLMProvider for WatsonxProvider {
         let content = Self::extract_text(&data);
         let tokens_used = data["usage"]["total_tokens"]
             .as_u64()
-            .map(|v| v as u32);
+            .and_then(|v| u32::try_from(v).ok());
 
-        Ok(ChatResponse { content, tokens_used, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used,
+            model: self.model.clone(),
+        })
     }
 }

@@ -16,7 +16,12 @@ pub struct OpenAIProvider {
 impl OpenAIProvider {
     #[must_use]
     pub fn new(api_key: String, model: String, base_url: String) -> Self {
-        Self { client: reqwest::Client::new(), api_key, model, base_url }
+        Self {
+            client: reqwest::Client::new(),
+            api_key,
+            model,
+            base_url,
+        }
     }
 
     /// Create from environment variables.
@@ -86,7 +91,9 @@ impl LLMProvider for OpenAIProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(LLMError::ApiError(format!("OpenAI error ({status}): {body}")));
+            return Err(LLMError::ApiError(format!(
+                "OpenAI error ({status}): {body}"
+            )));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -94,9 +101,15 @@ impl LLMProvider for OpenAIProvider {
             .as_str()
             .unwrap_or("")
             .to_string();
-        let tokens_used = data["usage"]["total_tokens"].as_u64().map(|v| v as u32);
+        let tokens_used = data["usage"]["total_tokens"]
+            .as_u64()
+            .and_then(|v| u32::try_from(v).ok());
 
-        Ok(ChatResponse { content, tokens_used, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used,
+            model: self.model.clone(),
+        })
     }
 
     async fn chat_with_tools(
@@ -140,7 +153,9 @@ impl LLMProvider for OpenAIProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(LLMError::ApiError(format!("OpenAI error ({status}): {body}")));
+            return Err(LLMError::ApiError(format!(
+                "OpenAI error ({status}): {body}"
+            )));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -148,8 +163,14 @@ impl LLMProvider for OpenAIProvider {
             .as_str()
             .unwrap_or("")
             .to_string();
-        let tokens_used = data["usage"]["total_tokens"].as_u64().map(|v| v as u32);
+        let tokens_used = data["usage"]["total_tokens"]
+            .as_u64()
+            .and_then(|v| u32::try_from(v).ok());
 
-        Ok(ChatResponse { content, tokens_used, model: self.model.clone() })
+        Ok(ChatResponse {
+            content,
+            tokens_used,
+            model: self.model.clone(),
+        })
     }
 }
