@@ -28,6 +28,7 @@ serde_json = "1"
 
 # CLI
 clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
 
 # Date-time
 jiff = { version = "0.2", features = ["serde"] }

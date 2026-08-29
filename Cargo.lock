@@ -139,6 +139,7 @@ dependencies = [
  "axum",
  "chrono",
  "clap",
+ "dotenvy",
  "git2",
  "hex",
  "rmcp",
@@ -244,13 +245,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "archaeologist-core",
+ "archaeologist-evidence",
  "async-trait",
+ "chrono",
  "reqwest",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 archaeologist-core = { workspace = true }
+archaeologist-evidence = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -16,6 +17,8 @@ async-trait = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,18 +1,24 @@
 //! `ask` command — answer a natural-language question about the codebase.
 //!
 //! Workflow:
-//! 1. Search symbols whose names fuzzy-match keywords extracted from the
-//!    question.
-//! 2. For every hit, fetch commits, dependencies, and DB evidence.
-//! 3. Aggregate & deduplicate evidence with the `evidence` crate.
-//! 4. Render a human-readable explanation via the `explainer`.
+//! 1. Extract keywords from the question.
+//! 2. Search symbols whose names fuzzy-match those keywords.
+//! 3. For every hit, fetch commits, dependencies, and DB evidence.
+//! 4. Aggregate & deduplicate evidence with the `evidence` crate.
+//! 5. Build a rich context prompt (question + symbols + evidence).
+//! 6. Send to the configured LLM provider and print the AI answer.
+//!    Falls back to the plain rule-based explainer if no LLM is configured.
 
 use anyhow::{Context, Result};
+use archaeologist_core::models::Symbol;
 use archaeologist_db::{
     create_pool, repositories::get_commit, repositories::get_evidence_for_symbol,
     repositories::list_symbol_commits, run_migrations,
 };
-use archaeologist_evidence::{aggregate_evidence, explain_symbol};
+use archaeologist_evidence::{aggregate_evidence, explain_symbol, EvidenceItem, Explanation};
+use archaeologist_llm::{
+    build_ask_prompt, create_provider, system_prompt, LLMConfig, SymbolContext,
+};
 use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
 use tracing::info;
 
@@ -44,7 +50,7 @@ pub async fn run(opts: AskOptions) -> Result<()> {
 
     info!(question = %opts.question, "ask command");
 
-    // ── 1. Extract keywords (simple whitespace split, strip punctuation) ──────
+    // ── 1. Extract keywords ───────────────────────────────────────────────────
     let keywords = extract_keywords(&opts.question);
     info!(?keywords, "extracted keywords");
 
@@ -53,7 +59,7 @@ pub async fn run(opts: AskOptions) -> Result<()> {
         return Ok(());
     }
 
-    // ── 2. Search for relevant symbols for each keyword ───────────────────────
+    // ── 2. Search for relevant symbols ────────────────────────────────────────
     let mut seen_ids = std::collections::HashSet::new();
     let mut symbols = Vec::new();
 
@@ -70,17 +76,17 @@ pub async fn run(opts: AskOptions) -> Result<()> {
         }
     }
 
+    println!("Question: {}\n", opts.question);
+
     if symbols.is_empty() {
         println!("No symbols found matching: {:?}", opts.question);
         println!("Tip: index a repository first with `archaeologist index <path>`.");
-        return Ok(());
     }
 
-    println!("Question: {}\n", opts.question);
+    // ── 3 & 4. Per-symbol: aggregate evidence ────────────────────────────────
+    let mut llm_contexts: Vec<(Symbol, Vec<EvidenceItem>, Explanation)> = Vec::new();
 
-    // ── 3 & 4. Per-symbol: aggregate evidence + explain ───────────────────────
     for sym in symbols.iter().take(3) {
-        // Fetch commits that touched this symbol.
         let sc_links = list_symbol_commits(&pool, sym.id).await.unwrap_or_default();
         let mut commits = Vec::new();
         for link in &sc_links {
@@ -89,19 +95,83 @@ pub async fn run(opts: AskOptions) -> Result<()> {
             }
         }
 
-        // Fetch existing DB evidence.
         let db_ev = get_evidence_for_symbol(&pool, sym.id)
             .await
             .unwrap_or_default();
 
         let evidence = aggregate_evidence(sym.id, Some(sym), &commits, &[], &db_ev);
         let explanation = explain_symbol(&sym.name, &evidence);
+        llm_contexts.push((sym.clone(), evidence, explanation));
+    }
 
-        println!("{}", explanation.to_display_string());
-        println!("{}", "─".repeat(60));
+    // ── 5 & 6. LLM answer or rule-based fallback ─────────────────────────────
+    match try_llm_answer(&opts.question, &llm_contexts).await {
+        Ok(answer) => {
+            println!("{answer}");
+        }
+        Err(e) => {
+            // LLM unavailable or not configured — degrade gracefully.
+            // Log the full chain so users can diagnose provider issues.
+            tracing::warn!("LLM unavailable — falling back to rule-based explainer");
+            tracing::warn!("  cause: {e:#}");
+            for (_, _, explanation) in &llm_contexts {
+                println!("{}", explanation.to_display_string());
+                println!("{}", "─".repeat(60));
+            }
+            if llm_contexts.is_empty() {
+                println!(
+                    "No evidence found. Index a repository first with \
+                     `archaeologist index <path>`."
+                );
+            }
+        }
     }
 
     Ok(())
+}
+
+/// Try to answer via the configured LLM provider.
+///
+/// Returns the answer string, or an error if no provider is configured /
+/// the provider call fails.
+async fn try_llm_answer(
+    question: &str,
+    contexts: &[(Symbol, Vec<EvidenceItem>, Explanation)],
+) -> Result<String> {
+    let config = LLMConfig::from_env()
+        .context("read LLM config — set LLM_PROVIDER (default: watsonx)")?;
+
+    let provider = create_provider(&config)
+        .context("initialise LLM provider — check provider env vars")?;
+
+    info!(provider = %provider.name(), "sending question to LLM");
+
+    let sym_contexts: Vec<SymbolContext<'_>> = contexts
+        .iter()
+        .map(|(sym, ev, expl)| SymbolContext {
+            symbol: sym,
+            evidence: ev,
+            explanation: expl,
+        })
+        .collect();
+
+    let messages = vec![system_prompt(), build_ask_prompt(question, &sym_contexts)];
+
+    let config_temp = config.temperature;
+    let config_max = config.max_tokens;
+
+    let response = provider
+        .chat(&messages, config_temp, config_max)
+        .await
+        .context("LLM chat call")?;
+
+    info!(
+        model = %response.model,
+        tokens = ?response.tokens_used,
+        "LLM response received"
+    );
+
+    Ok(response.content)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -16,8 +16,10 @@
 //! ```
 
 pub mod config;
+pub mod prompt;
 pub mod provider;
 pub mod providers;
 
 pub use config::{create_provider, LLMConfig};
+pub use prompt::{build_ask_prompt, system_prompt, SymbolContext};
 pub use provider::{ChatMessage, ChatResponse, LLMError, LLMProvider, Role, ToolDefinition};

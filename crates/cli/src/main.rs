@@ -2,6 +2,13 @@ use archaeologist_cli::commands;
 use archaeologist_core::AppConfig;
 use clap::{Parser, Subcommand};
 
+// Load `.env` before anything reads env vars.
+// `ok()` silences the "file not found" error so production deploys without a
+// `.env` file work without changes.
+fn load_dotenv() {
+    dotenvy::dotenv().ok();
+}
+
 #[derive(Parser)]
 #[command(name = "archaeologist")]
 #[command(about = "AI Software Archaeologist - answers 'why is the code like this?'")]
@@ -94,6 +101,7 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    load_dotenv();
     let config = AppConfig::from_env()?;
     let cli = Cli::parse();
 
