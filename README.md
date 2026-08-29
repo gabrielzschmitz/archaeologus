@@ -1,6 +1,6 @@
 # Archaeologus
 
-<!-- <img align="right" width="192px" src="./resources/icons/icon.svg" alt="Archaeologus Logo"> -->
+<img align="right" width="192px" src="./resources/icons/icon.png" alt="Archaeologus Logo">
 
 <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 <a href="https://www.buymeacoffee.com/gabrielzschmitz" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 20px !important;width: 87px;" ></a>
