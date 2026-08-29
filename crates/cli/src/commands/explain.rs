@@ -63,10 +63,9 @@ async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<(
 
     let mut found = false;
     for repo in &repos {
-        if let Some(file) =
-            get_file_by_path(pool, repo.id, target)
-                .await
-                .unwrap_or(None)
+        if let Some(file) = get_file_by_path(pool, repo.id, target)
+            .await
+            .unwrap_or(None)
         {
             found = true;
             println!("File      : {}", file.path);
@@ -75,17 +74,16 @@ async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<(
             println!("Size      : {} bytes", file.size_bytes);
 
             // List symbols in this file.
-            let syms: Vec<archaeologist_core::models::Symbol> =
-                sqlx::query_as(
-                    "SELECT id, file_id, repository_id, name, symbol_type, language,
+            let syms: Vec<archaeologist_core::models::Symbol> = sqlx::query_as(
+                "SELECT id, file_id, repository_id, name, symbol_type, language,
                             line_start, line_end, col_start, col_end,
                             visibility, doc_comment, raw_text, created_at
                      FROM symbols WHERE file_id = $1 ORDER BY line_start",
-                )
-                .bind(file.id)
-                .fetch_all(pool)
-                .await
-                .unwrap_or_default();
+            )
+            .bind(file.id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
 
             if syms.is_empty() {
                 println!("\nNo indexed symbols.");
@@ -106,7 +104,7 @@ async fn explain_file(pool: &archaeologist_db::PgPool, target: &str) -> Result<(
     }
 
     if !found {
-        println!("No indexed file matching {:?}.", target);
+        println!("No indexed file matching {target:?}.");
         println!("Tip: index a repository first with `archaeologist index <path>`.");
     }
 
@@ -124,12 +122,10 @@ async fn explain_symbol_cmd(
     if let Some(lang) = language {
         q = q.language(lang);
     }
-    let result = search_symbols(pool, &q)
-        .await
-        .context("symbol search")?;
+    let result = search_symbols(pool, &q).await.context("symbol search")?;
 
     if result.items.is_empty() {
-        println!("No symbol matching {:?} found.", target);
+        println!("No symbol matching {target:?} found.");
         println!("Tip: index a repository first with `archaeologist index <path>`.");
         return Ok(());
     }
@@ -163,7 +159,11 @@ async fn explain_symbol_cmd(
         if !deps.is_empty() {
             println!("Dependencies ({}):", deps.len());
             for d in &deps {
-                println!("  [{ty}] {name}", ty = d.dependency_type, name = d.dependency_name);
+                println!(
+                    "  [{ty}] {name}",
+                    ty = d.dependency_type,
+                    name = d.dependency_name
+                );
             }
         }
 

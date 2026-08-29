@@ -7,8 +7,8 @@
 //! * A risk estimate based on caller count and test coverage
 
 use anyhow::{Context, Result};
-use archaeologist_db::{create_pool, run_migrations, PgPool};
 use archaeologist_core::models::Symbol;
+use archaeologist_db::{create_pool, run_migrations, PgPool};
 use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
 use tracing::info;
 use uuid::Uuid;
@@ -45,9 +45,7 @@ pub async fn run(opts: ImpactOptions) -> Result<()> {
     if let Some(ref lang) = opts.language {
         q = q.language(lang.as_str());
     }
-    let result = search_symbols(&pool, &q)
-        .await
-        .context("symbol search")?;
+    let result = search_symbols(&pool, &q).await.context("symbol search")?;
 
     if result.items.is_empty() {
         println!("No symbol matching {:?} found.", opts.symbol);
@@ -104,7 +102,11 @@ async fn print_impact(pool: &PgPool, sym: &Symbol) {
     } else {
         println!("  Direct callers ({}):", direct_callers.len());
         for caller in &direct_callers {
-            let test_tag = if is_test_symbol(caller) { " [TEST]" } else { "" };
+            let test_tag = if is_test_symbol(caller) {
+                " [TEST]"
+            } else {
+                ""
+            };
             println!(
                 "    [{lang}] {ty} {name}{test_tag}",
                 lang = caller.language,
@@ -117,7 +119,11 @@ async fn print_impact(pool: &PgPool, sym: &Symbol) {
     if !indirect_callers.is_empty() {
         println!("  Indirect callers ({}):", indirect_callers.len());
         for caller in &indirect_callers {
-            let test_tag = if is_test_symbol(caller) { " [TEST]" } else { "" };
+            let test_tag = if is_test_symbol(caller) {
+                " [TEST]"
+            } else {
+                ""
+            };
             println!(
                 "    [{lang}] {ty} {name}{test_tag}",
                 lang = caller.language,
@@ -127,13 +133,13 @@ async fn print_impact(pool: &PgPool, sym: &Symbol) {
         }
     }
 
-    if !test_callers.is_empty() {
+    if test_callers.is_empty() {
+        println!("  Tests: none found — consider adding tests before changing this symbol.");
+    } else {
         println!("  Tests covering this symbol ({}):", test_callers.len());
         for t in &test_callers {
             println!("    {}", t.name);
         }
-    } else {
-        println!("  Tests: none found — consider adding tests before changing this symbol.");
     }
 
     // ── Risk estimate ─────────────────────────────────────────────────────────
@@ -170,18 +176,20 @@ async fn find_direct_callers(pool: &PgPool, target_id: Uuid) -> Vec<Symbol> {
 }
 
 /// Return `true` if the symbol looks like a test function.
+#[must_use]
 pub fn is_test_symbol(sym: &Symbol) -> bool {
     let name_lc = sym.name.to_lowercase();
     name_lc.starts_with("test")
         || name_lc.ends_with("_test")
         || name_lc.contains("_test_")
-        || sym.doc_comment
+        || sym
+            .doc_comment
             .as_deref()
-            .map(|d| d.contains("#[test]") || d.contains("@test"))
-            .unwrap_or(false)
+            .is_some_and(|d| d.contains("#[test]") || d.contains("@test"))
 }
 
 /// Produce a qualitative risk label.
+#[must_use]
 pub fn estimate_risk(total_callers: usize, test_count: usize) -> &'static str {
     match (total_callers, test_count) {
         (0, _) => "LOW — no known callers, safe to change",

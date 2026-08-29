@@ -42,9 +42,7 @@ pub async fn run(opts: HistoryOptions) -> Result<()> {
     if let Some(ref lang) = opts.language {
         q = q.language(lang.as_str());
     }
-    let result = search_symbols(&pool, &q)
-        .await
-        .context("symbol search")?;
+    let result = search_symbols(&pool, &q).await.context("symbol search")?;
 
     if result.items.is_empty() {
         println!("No symbol matching {:?} found.", opts.symbol);
@@ -53,9 +51,7 @@ pub async fn run(opts: HistoryOptions) -> Result<()> {
     }
 
     for sym in &result.items {
-        let sc_links = list_symbol_commits(&pool, sym.id)
-            .await
-            .unwrap_or_default();
+        let sc_links = list_symbol_commits(&pool, sym.id).await.unwrap_or_default();
 
         let mut commits = Vec::new();
         for link in &sc_links {
@@ -65,7 +61,7 @@ pub async fn run(opts: HistoryOptions) -> Result<()> {
         }
 
         // Sort by date descending (most recent first).
-        commits.sort_by(|(a, _), (b, _)| b.author_date.cmp(&a.author_date));
+        commits.sort_by_key(|(a, _)| std::cmp::Reverse(a.author_date));
 
         println!(
             "Symbol: {} {} [{}]  (file: {})",
@@ -84,8 +80,8 @@ pub async fn run(opts: HistoryOptions) -> Result<()> {
         } else {
             println!("\n  Commit history ({} commit(s)):", commits.len());
             println!(
-                "  {:<10}  {:<12}  {:<20}  {:<12}  {}",
-                "SHA", "Date", "Author", "Change", "Message"
+                "  {:<10}  {:<12}  {:<20}  {:<12}  Message",
+                "SHA", "Date", "Author", "Change"
             );
             println!("  {}", "─".repeat(90));
 

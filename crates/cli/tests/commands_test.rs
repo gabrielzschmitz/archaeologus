@@ -19,7 +19,10 @@ mod ask_tests {
     fn stop_words_not_in_keywords() {
         let kw = extract_keywords("What does the authenticate function do?");
         for stop in &["what", "does", "the", "do"] {
-            assert!(!kw.contains(&stop.to_string()), "stop word '{stop}' found in {kw:?}");
+            assert!(
+                !kw.contains(&stop.to_string()),
+                "stop word '{stop}' found in {kw:?}"
+            );
         }
     }
 

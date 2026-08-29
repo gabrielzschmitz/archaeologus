@@ -9,8 +9,8 @@
 
 use anyhow::{Context, Result};
 use archaeologist_db::{
-    create_pool, repositories::get_evidence_for_symbol, repositories::list_symbol_commits,
-    repositories::get_commit, run_migrations,
+    create_pool, repositories::get_commit, repositories::get_evidence_for_symbol,
+    repositories::list_symbol_commits, run_migrations,
 };
 use archaeologist_evidence::{aggregate_evidence, explain_symbol};
 use archaeologist_search::symbol_search::{search_symbols, SymbolQuery};
@@ -62,9 +62,7 @@ pub async fn run(opts: AskOptions) -> Result<()> {
         if let Some(ref lang) = opts.language {
             q = q.language(lang.as_str());
         }
-        let result = search_symbols(&pool, &q)
-            .await
-            .context("symbol search")?;
+        let result = search_symbols(&pool, &q).await.context("symbol search")?;
         for sym in result.items {
             if seen_ids.insert(sym.id) {
                 symbols.push(sym);
@@ -78,10 +76,7 @@ pub async fn run(opts: AskOptions) -> Result<()> {
         return Ok(());
     }
 
-    println!(
-        "Question: {}\n",
-        opts.question
-    );
+    println!("Question: {}\n", opts.question);
 
     // ── 3 & 4. Per-symbol: aggregate evidence + explain ───────────────────────
     for sym in symbols.iter().take(3) {
@@ -112,16 +107,16 @@ pub async fn run(opts: AskOptions) -> Result<()> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Split a question into lowercase alpha-numeric keyword tokens (≥ 3 chars).
+#[must_use]
 pub fn extract_keywords(question: &str) -> Vec<String> {
     let stop_words = [
-        "the", "a", "an", "is", "it", "in", "of", "for", "and", "or",
-        "to", "what", "why", "how", "does", "do", "did", "was", "are",
-        "this", "that", "with", "where", "when", "who", "which",
+        "the", "a", "an", "is", "it", "in", "of", "for", "and", "or", "to", "what", "why", "how",
+        "does", "do", "did", "was", "are", "this", "that", "with", "where", "when", "who", "which",
     ];
     question
         .split(|c: char| !c.is_alphanumeric() && c != '_')
         .filter(|t| t.len() >= 3)
-        .map(|t| t.to_lowercase())
+        .map(str::to_lowercase)
         .filter(|t| !stop_words.contains(&t.as_str()))
         .collect::<std::collections::LinkedList<_>>()
         .into_iter()
