@@ -58,6 +58,18 @@ cargo run -- search "fn process"
 - REST API with OpenAPI/Swagger docs
 - CLI-first, with the same engine exposed over the MCP protocol and HTTP
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=stjPfYCJRC0">
+    <img src="./resources/demo.jpg" alt="Archaeologus demonstration" style="width: 584px; padding: 0;">
+  </a>
+</p>
+<p align="center">
+  <em>
+    Watch the demonstration above to see Archaeologus in action, <br>
+    including its core features, AI-powered code analysis, and REST API.
+  </em>
+</p>
+
 ---
 
 ## Install dependencies
